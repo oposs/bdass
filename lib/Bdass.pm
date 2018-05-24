@@ -47,6 +47,12 @@ has database => sub {
     return $database;
 };
 
+sub startup {
+    my $app = shift;
+    $app->config->cfgHash; # read and validate config
+    unshift @{$app->commands->namespaces},  __PACKAGE__.'::Command';
+    $app->SUPER::startup(@_);
+};
 1;
 
 =head1 COPYRIGHT

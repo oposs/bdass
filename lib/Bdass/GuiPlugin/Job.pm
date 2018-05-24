@@ -101,7 +101,7 @@ has actionCfg => sub {
                 minWidth => 500
             },
             backend => {
-                plugin => 'jobForm',
+                plugin => 'JobForm',
                 config => {
                     type => 'add'
                 }
@@ -118,7 +118,7 @@ has actionCfg => sub {
             name => 'jobFormEdit',
             popupTitle => trm('Edit job'),
             backend => {
-                plugin => 'jobForm',
+                plugin => 'JobForm',
                 config => {
                     type => 'edit'
                 }

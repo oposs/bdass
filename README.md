@@ -1,56 +1,25 @@
-Big Data Archive System Service
-===============================
-Version: #VERSION#
-Date: #DATE#
+# Big Data Archive System Service
 
-Handle Migration of Big Data Archives from one system to another
+#VERSION#, #DATE#
 
-You are looking at a sample CallBackery application. It comes complete
-with a classic "configure - make - install" setup.
+Handle archiving of large data Folders to archival storage systems. With large multi terrabyte datasets such
+data archiving and migration can be both time consuming as well as costly. In a heterogeneous
 
-Prerequisite
-------------
+## Installation
 
-Get a copy of the Qooxdoo SDK from www.qooxdoo.org.
-
- mkdir ~/src
- cd ~/src
- wget https://github.com/qooxdoo/qooxdoo/archive/master.zip
- unzip master.zip
-
-Setup
------
-Now get back to your app source directory and start building.
+Unpack the tar archivt back to your app source directory and start building.
 If you come from installing callbackery make sure to do the following
 in a new terminal or unset $PERL5LIB
 
- ./configure --prefix=$HOME/opt/bdass --with-qooxdoo-sdk-dir=$HOME/src/qooxdoo-master
- make
+```console
+./configure --prefix=$HOME/opt/bdass
+make
+```
 
 Configure will check if all requirements are met and give
 hints on how to fix the situation if something is missing.
 
-Any mising perl modules will be downloaded and built.
-
-Development
------------
-
-While developing the application it is convenient to NOT have to install it
-before runnning. You can actually serve the Qooxdoo source directly
-using the built-in Mojo webserver.
-
-  cd frontend
-  make source
-  cd ../bin
-  ./bdass-source-mode.sh
-
-You can now connect to the CallBackery app with your web browser.
-
-If you need any additional perl modules, write their names into the PERL_MODULES
-file and run ./bootstrap.
-
-Installation
-------------
+Any mising perl modules will be built when you type `make`.
 
 To install the application, just run
 
@@ -61,20 +30,50 @@ You can now run bdass.pl in reverse proxy mode.
    cd $HOME/opt/bdass/bin
    ./bdass.pl prefork
 
-Packaging
----------
+## Development
+
+While developing the application it is convenient to NOT have to install it
+before runnning. You can actually serve the Qooxdoo source directly
+using the built-in Mojo webserver.
+
+To get this going you first have to provide a copy of the qooxdoo-sdk
+and run configure accordingly
+
+```console
+git clone --depth=1 https://github.com/qooxdoo/qooxdoo.git qooxdoo-sdk
+./configure --with-qooxdoo-sdk-dir=$(pwd)/qooxdoo-sdk
+make
+```
+
+then you can run the dev version
+
+```console
+cd bin
+./bdass-source-mode.sh
+```
+
+If you need any additional perl modules, write their names into the PERL_MODULES
+file and run make again
+
+## Packaging
 
 Before releasing, make sure to update CHANGES, VERSION and run ./bootstrap
 
 You can also package the application as a nice tar.gz file, it will contain
 a mini copy of cpan, so that all perl modules can be rebuilt at the
 destination.  If you want to make sure that your project builds with perl
-5.10.1, make sure to set the PERL environment variable to a perl 5.10.1 interpreter,
-make sure to delete any PERL5LIB environment variable, remove the thirdparty
-directory from your source tree and configure again.  Now all modules to build your
-project with any perl from 5.10.1 on upward will be included in the distribution.
+5.10.1 but you are not working with perl 5.10.1 (hopefully) you can use
+perlbrew to install the old version and then do:
 
-   make dist
+```console
+make clean
+touch PERL_MODULES
+make PERL=perl5.10.1
+make clean
+make dist
+```
+
+now your package contains all the modules required to build on a system with perl-5.10.1. Not that I would recommend doing that!
 
 Enjoy!
 

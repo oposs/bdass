@@ -54,6 +54,12 @@ has formCfg => sub {
             },
         },
         {
+            key => 'job_src_host',
+            label => trm('Source Host'),
+            widget => 'selectBox',
+            
+        },
+        {
             key => 'job_note',
             label => trm('Note'),
             widget => 'textArea',
