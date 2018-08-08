@@ -1,0 +1,3 @@
+%# shell code to return every byte entered as is
+dd bs=1
+

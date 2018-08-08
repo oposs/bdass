@@ -1,0 +1,88 @@
+{
+  "extends": "qx",
+  "parser": "babel-eslint",
+  "globals": {
+    "callbackery": false,
+    "hin_cred_mgr": false,
+    "hin_agw_mgr": false,
+    "hin_agw_appliance": false,
+    "window": false,
+    "document": false
+  },
+  "rules": {
+    "max-len": [
+      2,
+      150
+    ],
+    "quotes": "off",
+    "new-cap": "off",
+    "require-jsdoc": "off",
+    "linebreak-style": [
+      "error",
+      "unix"
+    ],
+    "curly": [
+      "warn",
+      "all"
+    ],
+    "block-scoped-var": "warn",
+    "brace-style": [
+      "warn",
+      "stroustrup"
+    ],
+    "indent": [
+      "warn",
+      4
+    ],
+    "object-property-newline": "warn",
+    "object-curly-newline": [
+      "warn",
+      {
+        "ObjectExpression": {
+          "multiline": true
+        },
+        "ObjectPattern": {
+          "multiline": true
+        }
+      }
+    ],
+    "key-spacing": [
+      "warn",
+      {
+        "singleLine": {
+          "beforeColon": false,
+          "afterColon": true
+        },
+        "multiLine": {
+          "beforeColon": false,
+          "afterColon": true,
+          "align": "value",
+          "mode": "minimum"
+        }
+      }
+    ],
+    "no-dupe-keys": "warn",
+    "no-dupe-class-members": "warn",
+    "no-unused-vars": [
+      "warn",
+      {
+        "args": "none"
+      }
+    ],
+    "operator-linebreak": [
+        "warn",
+        "after",
+        {
+            "overrides": {
+                "&&": "before",
+                "||": "before",
+                "+" : "before",
+                "-" : "before",
+                "/" : "before",
+                "*" : "before",
+                "%" : "before"
+            }
+        }
+    ]
+  }
+}
