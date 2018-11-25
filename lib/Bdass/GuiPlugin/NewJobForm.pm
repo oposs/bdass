@@ -1,4 +1,4 @@
-package Bdass::GuiPlugin::JobForm;
+package Bdass::GuiPlugin::NewJobForm;
 use Mojo::Base 'CallBackery::GuiPlugin::AbstractForm';
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
@@ -6,15 +6,15 @@ use POSIX qw(strftime);
 
 =head1 NAME
 
-Bdass::GuiPlugin::JobForm - Job Edit Form
+Bdass::GuiPlugin::NewJobForm - Job Edit Form
 
 =head1 SYNOPSIS
 
- use Bdass::GuiPlugin::JobForm;
+ use Bdass::GuiPlugin::NewJobForm;
 
 =head1 DESCRIPTION
 
-The Job Edit Form
+Use this form to submit a job for archiving.
 
 =cut
 

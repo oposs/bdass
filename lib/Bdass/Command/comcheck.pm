@@ -6,140 +6,47 @@ Bdass::Command::com-test - BDass communication test
 
 =name SYNOPSIS
 
- ./bdass.pl comcheck ubuntu dest-host
+ ./bdass.pl comcheck remoteHostKey
 
 =name DESCRIPTION
 
-Connect to host dest-host and test connection
+connect to remote hosts and find repos
 
 =cut
 
-use Mojo::Base 'Mojolicious::Command';
+use Mojo::Base 'Mojolicious::Command', -signatures;
 use Mojo::IOLoop::ReadWriteFork;
 use Mojo::Util qw(dumper);
-use Mojo::Promise;
+use Bdass::Model::DataSource;
 
 use Getopt::Long;
 
 has description => <<'EOF';
-Connect to host dest-host and test connection
+Query remote hosts to find archiving candidates
 EOF
 
 has usage => <<"EOF";
-usage: $0 com-test <flavor> dest-host
-
+usage: $0 comcheck 
 EOF
-
 my %opt;
-
-has 'destHost';
-
-has ssh => sub {
-    my $self = shift;
-    my $ssh = Mojo::IOLoop::ReadWriteFork->new;
-
-    # Emitted if something terrible happens
-    $ssh->on(error => sub { 
-        my ($fork, $error) = @_; 
-        $self->log->error($error); 
-    });
-
-    # Emitted when the child completes
-    $ssh->on(close => sub { 
-        my ($fork, $exit_value, $signal) = @_; Mojo::IOLoop->stop; 
-    });
-    # Start the application
-    $ssh->start({
-        program => "ssh",
-        program_args => [$self->destHost],
-        conduit => 'pty',
-        raw => 1,
-        env => {}
-    });
-    return $ssh;
-};
 
 has log => sub { shift->app->log };
 
-has commands => sub {
-    dd => {
-        check => {
-            "dd --version",
-        }
-    }
-};
+has cfg => sub { shift->app->config->cfgHash->{CONNECTION} };
 
 sub run {
     my $self   = shift;
     local @ARGV = @_ if @_;
     GetOptions(\%opt,
-            'verbose|v','cfgglob=s');
-    
-    my ($flavor,$dest) = @ARGV;
-
-    if ($flavor ne 'ubuntu'){
-        die "Sorry $flavor is not supported yet\n";
-    }
-    $self->destHost($dest);  
-    $self->setPrompt('hello> ')->then(sub{
-        $self->checkTransparency();
+            'verbose|v');
+    my @work;
+    my @data;
+    my $data = Bdass::Model::DataSource->new(app=>$self->app);
+    $data->getArchiveCandidates->then(sub {
+        my $data = shift;
+        $self->app->log->info(dumper $data);
     })->wait;
-    Mojo::IOLoop->start;
-}
-
-sub setPrompt {
-    my $self = shift;
-    my $promise = Mojo::Promise->new;
-    my $prompt = shift;
-    my $ssh = $self->ssh;
-    my $buff = '';
-    my $okCb;
-    $okCb = sub {
-        my ($fork, $buf) = @_;
-        $buff .= $buf;
-        warn dumper($buff);
-        if ($buff =~ /$prompt/){
-            $fork->unsubscribe(read=>$okCb);
-            $self->log->info("prompt check successful");
-            $promise->resolve();
-        }
-    };    
-    $ssh->on(read=>$okCb);
-    $ssh->write(qq{stty -echo\nPS1='${prompt}'\n});
-    return $promise;
-}
-
-sub checkTransparency {;
-    my $self = shift;
-    my $promise = Mojo::Promise->new;
-    my $send_ord = 0;
-    my $buff = ''  ;
-    my $ssh = $self->ssh;
-    my $readCb;
-    $readCb = sub {
-        my ($fork, $buf) = @_;
-        $buff .= $buf;
-        #warn dumper($buff);
-        # $self->log->debug("got >".dumper($buf));
-        while ($buff =~ s/^.*?>(.)<\n//s){
-            my $ord = ord($1);
-            if ($ord != $send_ord){
-                $self->log->error("expected chr($send_ord) got chr($ord)");
-            }
-            if ($ord == 255){
-                $fork->unsubscribe(read=>$readCb);
-                $self->log->info("com transparency check successful");
-                $promise->resolve();
-            }
-            else {
-                $fork->write('>'.chr(++$send_ord).'<'."\n");
-            }
-        }
-    };
-    $ssh->on(read => $readCb);
-    $ssh->write("dd bs=4 count=256\n");
-    $ssh->write('>'.chr($send_ord)."<\n");
-    return $promise;
+    $self->app->log->info("all done");
 }
 
 1;

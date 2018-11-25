@@ -1,6 +1,8 @@
 package Bdass;
 
 use Mojo::Base 'CallBackery';
+use Bdass::Model::Config;
+use Bdass::Model::User;
 
 =head1 NAME
 
@@ -31,7 +33,7 @@ use our own plugin directory and our own configuration file:
 
 has config => sub {
     my $self = shift;
-    my $config = $self->SUPER::config(@_);
+    my $config = Bdass::Model::Config->new(app=>$self);
     $config->file($ENV{Bdass_CONFIG} || $self->home->rel_file('etc/bdass.cfg'));
     unshift @{$config->pluginPath}, 'Bdass::GuiPlugin';
     return $config;
@@ -53,6 +55,12 @@ sub startup {
     unshift @{$app->commands->namespaces},  __PACKAGE__.'::Command';
     $app->SUPER::startup(@_);
 };
+
+has userObject => sub {
+    Bdass::Model::User->new;
+};
+
+
 1;
 
 =head1 COPYRIGHT
@@ -71,20 +79,23 @@ __DATA__
 
 -- 1 up
 
-CREATE TABLE song (
-    song_id    INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    song_title TEXT NOT NULL,
-    song_voices TEXT,
-    song_composer TEXT,
-    song_page INTEGER,
-    song_note TEXT
+INSERT INTO cbright (cbright_key,cbright_label)
+    VALUES ('write','Writer');
+
+CREATE TABLE IF NOT EXISTS js (
+    js_id INTEGER PRIMARY KEY,
+    js_name TEXT
 );
 
--- add an extra right for people who can edit
-
-INSERT INTO cbright (cbright_key,cbright_label)
-    VALUES ('write','Editor');
-
--- 1 down
-
-DROP TABLE song;
+INSERT INTO js
+    VALUES (1,'new'),(2,'approved'),
+    (3,'processing'),(4,'archived'),
+    (5,'cancled'),(6,'denied');
+    
+CREATE TABLE IF NOT EXISTS job (
+    job_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_cbuser INTEGER NOT NULL REFERENCES cbuser(cbuser_id),
+    job_src TEXT NOT NULL,
+    job_dst TEXT,
+    job_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'))
+);

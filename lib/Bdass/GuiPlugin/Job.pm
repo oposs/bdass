@@ -29,15 +29,10 @@ has formCfg => sub {
     my $db = $self->user->db;
 
     return [
-        {
-            widget => 'header',
-            label => trm('*'),
-            note => trm('Nice Start')
-        },
+        
         {
             key => 'job_title',
             widget => 'text',
-            note => 'Just type the title of a job',
             label => 'Search',
             set => {
                 placeholder => 'Job Title',
@@ -63,19 +58,26 @@ has tableCfg => sub {
             primary => $self->true
         },
         {
-            label => trm('Title'),
+            label => trm('Src'),
             type => 'string',
             width => '6*',
-            key => 'job_title',
+            key => 'job_src',
             sortable => $self->true,
         },
         {
-            label => trm('Note'),
+            label => trm('Dst'),
             type => 'string',
-            width => '3*',
-            key => 'job_note',
+            width => '6*',
+            key => 'job_dst',
             sortable => $self->true,
         },
+        {
+            label => trm('Created'),
+            type => 'string',
+            width => '2*',
+            key => 'job_ts_created',
+            sortable => $self->true,
+        }
      ]
 };
 
@@ -91,60 +93,60 @@ has actionCfg => sub {
 
     return [
         {
-            label => trm('Add job'),
+            label => trm('Create Job'),
             action => 'popup',
             addToContextMenu => $self->false,
-            name => 'jobFormAdd',
+            name => 'newJobAdd',
             popupTitle => trm('New job'),
             set => {
                 minHeight => 600,
                 minWidth => 500
             },
             backend => {
-                plugin => 'JobForm',
+                plugin => 'NewJob',
                 config => {
                     type => 'add'
                 }
             }
         },
-        {
-            action => 'separator'
-        },
-        {
-            label => trm('Edit'),
-            action => 'popup',
-            addToContextMenu => $self->true,
-            defaultAction => $self->true,
-            name => 'jobFormEdit',
-            popupTitle => trm('Edit job'),
-            backend => {
-                plugin => 'JobForm',
-                config => {
-                    type => 'edit'
-                }
-            }
-        },
-        {
-            label => trm('Delete'),
-            action => 'submitVerify',
-            addToContextMenu => $self->true,
-            question => trm('Do you really want to delete the selected job '),
-            key => 'delete',
-            handler => sub {
-                my $args = shift;
-                my $id = $args->{selection}{job_id};
-                die mkerror(4992,"You have to select a job first")
-                    if not $id;
-                my $db = $self->user->db;
-                if ($db->deleteData('job',$id) == 1){
-                    return {
-                         action => 'reload',
-                    };
-                }
-                die mkerror(4993,"Faild to remove job $id");
-                return {};
-            }
-        }
+        # {
+        #     action => 'separator'
+        # },
+        # {
+        #     label => trm('Edit'),
+        #     action => 'popup',
+        #     addToContextMenu => $self->true,
+        #     defaultAction => $self->true,
+        #     name => 'jobFormEdit',
+        #     popupTitle => trm('Edit job'),
+        #     backend => {
+        #         plugin => 'JobForm',
+        #         config => {
+        #             type => 'edit'
+        #         }
+        #     }
+        # },
+        # {
+        #     label => trm('Delete'),
+        #     action => 'submitVerify',
+        #     addToContextMenu => $self->true,
+        #     question => trm('Do you really want to delete the selected job '),
+        #     key => 'delete',
+        #     handler => sub {
+        #         my $args = shift;
+        #         my $id = $args->{selection}{job_id};
+        #         die mkerror(4992,"You have to select a job first")
+        #             if not $id;
+        #         my $db = $self->user->db;
+        #         if ($db->deleteData('job',$id) == 1){
+        #             return {
+        #                  action => 'reload',
+        #             };
+        #         }
+        #         die mkerror(4993,"Faild to remove job $id");
+        #         return {};
+        #     }
+        # }
     ];
 };
 

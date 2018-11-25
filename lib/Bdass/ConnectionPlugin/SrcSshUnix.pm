@@ -1,105 +1,115 @@
 package Bdass::ConnectionPlugin::SrcSshUnix;
 
-use Mojo::Base qw(Bdass::ConnectionPlugin::base);
+=head1 NAME
 
-sub makeTransport {
-    my $self = shift;
-    my $dest = shift;
-    my $ssh = Mojo::IOLoop::ReadWriteFork->new;
+Bdass::ConnectionPlugin::Base - abstract connection plugin
 
-    # Emitted if something terrible happens
-    $ssh->on(error => sub { 
-        my ($fork, $error) = @_; 
-        $self->log->error($error); 
-    });
+=head1 SYNOPSIS
 
-    # Emitted when the child completes
-    $ssh->on(close => sub { 
-        my ($fork, $exit_value, $signal) = @_;
-    });
-    # Start the application
-    $ssh->start({
-        program => "ssh",
-        program_args => [$dest],
-        conduit => 'pty',
-        raw => 1,
-        env => {}
-    });
-    $self->setPrompt();
-    return $ssh;
+ use Bdass::ConnectionPlugin::SrcSshUnix;
+
+
+=head1 DESCRIPTION
+
+The Ssh Connection Plugin Class
+
+=cut
+
+use Mojo::Base qw(Bdass::ConnectionPlugin::base -signatures);
+use Mojo::IOLoop::ReadWriteFork;
+use Mojo::Util qw(dumper);
+
+has buffer => sub {''};
+
+has '_transport';
+
+has delimiter => sub {'>>>>kjlasdfasdfasdfasdf89079ikhjkalsdjhfsdf<<<<' 
 };
 
-has log => sub { shift->app->log };
 
-sub run {
-    my $self   = shift;
-    local @ARGV = @_ if @_;
-    GetOptions(\%opt,
-            'verbose|v','cfgglob=s');
-    
-    my ($flavor,$dest) = @ARGV;
+sub sshTransport ($self) {
+    if (not defined $self->_transport){
+        my $ssh = Mojo::IOLoop::ReadWriteFork->new;
 
-    if ($flavor ne 'ubuntu'){
-        die "Sorry $flavor is not supported yet\n";
+        # Emitted when the child completes
+        $ssh->on(error => sub { 
+            my ($ssh, $error) = @_;
+            $self->log->error("ssh died $error");
+            $ssh = undef;
+        });
+        # Emitted when the child completes
+        $ssh->on(close => sub { 
+            my ($ssh, $exit_value, $signal) = @_;
+            $self->log->info("ssh closed $exit_value/$signal");
+            $ssh = undef;
+            #   if ($signal > ???){
+            #      $self->ssh($self->makeTransport);
+            #   }
+        });
+        $ssh->on(read => sub {
+            my ($ssh, $buff) = @_;
+            # $self->log->debug($self->name.": got >".$buff);
+            $self->buffer($self->buffer.$buff);
+            $self->emit('gotData');
+        });
+        # Start the application
+        $ssh->start({
+            program => "ssh",
+            program_args => [$self->url->host,'-T'],
+            env => {
+                SSH_AUTH_SOCK => $ENV{SSH_AUTH_SOCK}
+            }
+        });
+        $self->log->debug($self->name.": start ssh to ".$self->url->host);
+        $self->_transport($ssh);
     }
-    $self->destHost($dest);  
-    $self->setPrompt('hello> ')->then(sub{
-        $self->checkTransparency();
-    })->wait;
-    Mojo::IOLoop->start;
-}
+    return $self->_transport;
+};
 
-sub setPrompt {
-    my $self = shift;
+sub listFolders ($self) {
+    my $delimiter = $self->delimiter;
+    my $prefix = $self->tokenFilePrefix;
     my $promise = Mojo::Promise->new;
-    my $prompt = shift;
-    my $ssh = $self->ssh;
-    my $buff = '';
-    my $okCb;
-    $okCb = sub {
-        my ($fork, $buf) = @_;
-        $buff .= $buf;
-        warn dumper($buff);
-        if ($buff =~ /$prompt/){
-            $fork->unsubscribe(read=>$okCb);
-            $self->log->info("prompt check successful");
-            $promise->resolve();
+    $self->log->debug($self->name.": stat");
+    $self->sshTransport->write("stat -c'>//>%Z<>%n<//<' 2>&1 ".
+        $self->_shellQuote(
+            map { $_ .'/'.$prefix.'*.txt' } @{$self->folderList}
+        )
+    .";echo '$delimiter'\n");
+    my @list;
+    $self->on('gotData',sub {
+        my $self = shift;
+        my $buffer = $self->buffer;
+        while ($buffer =~ s[.*?>//>(\d+)<>(.+?)/${prefix}(.+?)\.txt<//<\n][]s) {
+            push @list, { 
+                ckey => $self->connectionId, 
+                ts => $1, 
+                path => $2, 
+                token => $3
+            };
         }
-    };    
-    $ssh->on(read=>$okCb);
-    $ssh->write(qq{stty -echo\nPS1='${prompt}'\n});
+        $self->buffer($buffer);
+        if ($buffer =~ s[.*$delimiter\n][]s){
+            $self->buffer($buffer);
+            $self->unsubscribe('gotData');
+            $promise->resolve(\@list);
+        }
+    });
     return $promise;
 }
 
-sub checkTransparency {;
-    my $self = shift;
-    my $promise = Mojo::Promise->new;
-    my $send_ord = 0;
-    my $buff = ''  ;
-    my $ssh = $self->ssh;
-    my $readCb;
-    $readCb = sub {
-        my ($fork, $buf) = @_;
-        $buff .= $buf;
-        #warn dumper($buff);
-        # $self->log->debug("got >".dumper($buf));
-        while ($buff =~ s/^.*?>(.)<\n//s){
-            my $ord = ord($1);
-            if ($ord != $send_ord){
-                $self->log->error("expected chr($send_ord) got chr($ord)");
-            }
-            if ($ord == 255){
-                $fork->unsubscribe(read=>$readCb);
-                $self->log->info("com transparency check successful");
-                $promise->resolve();
-            }
-            else {
-                $fork->write('>'.chr(++$send_ord).'<'."\n");
-            }
-        }
-    };
-    $ssh->on(read => $readCb);
-    $ssh->write("dd bs=4 count=256\n");
-    $ssh->write('>'.chr($send_ord)."<\n");
-    return $promise;
-}
+1;
+
+
+
+__END__
+
+=head1 AUTHOR
+
+S<Tobias Oetiker E<lt>tobi@oetiker.chE<gt>>
+
+=head1 HISTORY
+
+ 2018-11-20 oetiker 0.0 first version
+
+=cut

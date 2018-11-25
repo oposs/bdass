@@ -1,5 +1,7 @@
+Mojolicious
 CallBackery
 Mojo::SQLite
 Mojo::IOLoop::ReadWriteFork
+Role::Tiny
 PPI
 JSON::Validator
