@@ -99,8 +99,8 @@ has actionCfg => sub {
             name => 'newJobAdd',
             popupTitle => trm('New job'),
             set => {
-                minHeight => 600,
-                minWidth => 500
+                minHeight => 500,
+                minWidth => 800
             },
             backend => {
                 plugin => 'NewJob',

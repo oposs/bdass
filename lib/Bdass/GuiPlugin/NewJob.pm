@@ -3,6 +3,7 @@ use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable';
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
 use Bdass::Model::DataSource;
+use POSIX qw(strftime);
 
 =head1 NAME
 
@@ -63,14 +64,14 @@ has tableCfg => sub {
         {
             label => trm('Created'),
             type => 'string',
-            width => '2*',
+            width => '3*',
             key => 'ts',
             sortable => $self->true,
         },
         {
             label => trm('Token'),
             type => 'string',
-            width => '2*',
+            width => '3*',
             key => 'token',
             sortable => $self->true,
         },
@@ -112,29 +113,26 @@ has actionCfg => sub {
 sub getTableRowCount {
     my $self = shift;
     my $args = shift;
-    my $rows;
-    # todo async callbackery
-    $self->dataSource->getArchiveCandidates->then(sub {
+    return $self->dataSource->getArchiveCandidates->then(sub {
         my $data = shift;
-        $rows = scalar @$data;
-    })->wait;
-    return $rows;
+        return scalar @$data;
+    });
 }
 
 sub getTableData {
     my $self = shift;
     my $args = shift;
-    my $data = [];
-    $self->dataSource->getArchiveCandidates->then(sub {
-        $self->log->info("#### GUGUGS ###");
-        $data = shift;
-    });
     my $sc = $args->{sortColumn} // 'ts';
-    return [
-        (sort { $a->{$sc} cmp $b->{$sc} } @$data)[
-            $args->{firstRow} .. $args->{lastRow} 
-        ]
-    ];
+    $self->dataSource->getArchiveCandidates->then(sub {
+        my $data = shift;
+        return [
+            map { ref $_ ? { %$_, 
+                ts => strftime('%Y-%m-%d %H:%M:%S %Z',localtime($_->{ts})) 
+            } : ()  } (sort { $a->{$sc} cmp $b->{$sc} } @$data)[
+                    $args->{firstRow} .. $args->{lastRow} 
+                ]
+        ];
+    });
 }
 
 1;
