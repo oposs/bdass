@@ -1,0 +1,54 @@
+
+*** BACKEND ***
+cfg_db = /tmp/bdass.db
+sesame_user = adfadsfasdf4ee3r
+# perl -MDigest::SHA -e 'print Digest::SHA::hmac_sha1_hex("access"),"\n"'
+sesame_pass = 393afhkjhffjj
+
+*** FRONTEND ***
+logo = ../resource/bdass/logo.png
+logo_small = ../resource/bdass/logo-small.png
+title = Big Data Archive System Service
+initial_plugin = Job
+company_name = OETIKER+PARTNER AG
+company_url = http://www.oetiker.ch
+# max_width = 800
+
+*** CONNECTION ***
++ Engelberg
+name = Server Englberg
+plugin = SrcSshUnix
+url = ssh://engelberg
+++ Folders
+/home/*
+/scratch/*
++ James
+name = Server James
+plugin = SrcSshUnix
+url = ssh://james
+++ Folders
+/home/*
+/scratch/*
+/aasf/*/*
++ Freddie
+name = Server James
+plugin = SrcSshUnix
+url = ssh://james
+++ Folders
+/home/*
+/scratch/*
+/aasf/*/*
+
+*** PLUGIN: InitialUser ***
+module = UserForm
+mode = init
+type = add
+tab-name = Create Initial User
+
+*** PLUGIN: Job ***
+module = Job
+tab-name = Archive Jobs
+
+*** PLUGIN: AdminUser ***
+module = Users
+tab-name = Admin User Manager

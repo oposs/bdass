@@ -1,0 +1,7 @@
+Mojolicious~8
+CallBackery@0.14.2
+Mojo::SQLite
+Mojo::IOLoop::ReadWriteFork
+Role::Tiny
+PPI
+JSON::Validator

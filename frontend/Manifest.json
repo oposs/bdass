@@ -1,0 +1,33 @@
+{
+  "info" :
+  {
+    "name" : "Bdass",
+
+    "summary" : "Bdass web app",
+    "description" : "A generic Callbackery app.",
+
+    "homepage" : "https://github.com/oetiker/qx-mojo-app",
+
+    "license" : "???",
+    "authors" :
+    [
+      {
+        "name" : "Tobias Oetiker (oetiker)",
+        "email" : "tobi@oetiker.ch"
+      }
+    ],
+
+    "version" : "#VERSION#",
+    "qooxdoo-versions": ["5.0"]
+  },
+
+  "provides" :
+  {
+    "namespace"   : "bdass",
+    "encoding"    : "utf-8",
+    "class"       : "source/class",
+    "resource"    : "source/resource",
+    "translation" : "source/translation",
+    "type"        : "application"
+  }
+}
