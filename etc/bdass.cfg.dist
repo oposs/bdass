@@ -19,25 +19,15 @@ company_url = http://www.oetiker.ch
 name = Server Englberg
 plugin = SrcSshUnix
 url = ssh://engelberg
-++ Folders
-/home/*
-/scratch/*
 + James
 name = Server James
 plugin = SrcSshUnix
 url = ssh://james
-++ Folders
-/home/*
-/scratch/*
-/aasf/*/*
 + Freddie
 name = Server James
 plugin = SrcSshUnix
-url = ssh://james
-++ Folders
-/home/*
-/scratch/*
-/aasf/*/*
+url = ssh://freddie
+
 
 *** PLUGIN: InitialUser ***
 module = UserForm

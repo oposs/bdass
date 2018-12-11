@@ -31,19 +31,27 @@ has 'name';
 has 'app';
 has 'url';
 has 'connectionId';
-has 'folderList';
 
 
 has tokenFilePrefix => 'BDASS_';
 
+=head3 checkHost($self)
 
-=head3 listFolders()
-
-return a promise which resolves to a list of folders if it is happy
+verify that the tools we need are present on the server in question
 
 =cut
 
-sub listFolders ($self) {
+sub checkHost ($self) {
+    return 0
+};
+
+=head3 checkFolder($path,$token)
+
+return a promise which resolves to a folder of the tokenFile is found 
+
+=cut
+
+sub checkFolder ($self,$path,$token) {
     return Mojo::Promise->new;
 };
 
@@ -54,10 +62,25 @@ return an event emitter with 'info','read' 'error' 'close' events
 
 =cut
 
-sub streamFolder ($self) {
+sub streamFolder ($self,$path) {
     return Mojo::EventEmitter->new;
 }
 
+=head3 sizeFolder ($self,$path)
+
+calculate the size of the data stored in the folder
+
+=cut
+
+sub sizeFolder ($self,$path,$token) {
+    return Mojo::Promise->new;
+};
+
+=head3 shellQuote($self,@args)
+
+turn an array into a shell-resistant array for ssh
+
+=cut
 
 sub _shellQuote ($self,@args) {
     for (@args){

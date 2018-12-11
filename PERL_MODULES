@@ -5,3 +5,4 @@ Mojo::IOLoop::ReadWriteFork
 Role::Tiny
 PPI
 JSON::Validator
+SQL::Abstract::Pg

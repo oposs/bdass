@@ -3,6 +3,7 @@ use Mojo::Base 'CallBackery::Config', -signatures;
 use File::Spec;
 use Mojo::Util qw(dumper);
 use Mojo::URL;
+use Mojo::Promise;
 
 =head1 NAME
 
@@ -54,8 +55,7 @@ has grammar => sub {
         _mandatory => [],
         '/\S+/' => {
             _vars => [qw(name plugin url)],
-            _sections => [qw(Folders)],
-            _mandatory => [qw(name plugin url Folders)],
+            _mandatory => [qw(name plugin url)],
             name => {
                 _doc => 'Display name for this instance'
             },
@@ -73,14 +73,6 @@ has grammar => sub {
             },
             url => {
                 _doc => 'url to connect to'
-            },
-            Folders => {
-                _doc => 'list of directories to scan',
-                _table => {
-                    0 => {
-                        _doc => 'directory'
-                    }
-                }
             }
         },
     };
@@ -111,16 +103,18 @@ sub instantiateConnectionPlugin ($self,$plugin) {
 
 sub postProcessCfg ($self,$cfg) {
     $self->SUPER::postProcessCfg($cfg);
+    my @hostChecks;
     for my $key (keys %{$cfg->{CONNECTION}}){
         my $pcfg = $cfg->{CONNECTION}{$key};
         my $plugin = $pcfg->{plugin};
         $plugin->name($pcfg->{name});
         $plugin->connectionId($key);
         $plugin->url(Mojo::URL->new($pcfg->{url}));
-        $pcfg->{Folders} = [
-            map {$_->[0]} @{$pcfg->{Folders}{_table}}];
-        $plugin->folderList($pcfg->{Folders});
         $plugin->app($self->app);
+        my $status = $plugin->checkHost;
+        if (not $status){
+            die "connection $key is not working\n";
+        }
     }
     return $cfg;
 }
