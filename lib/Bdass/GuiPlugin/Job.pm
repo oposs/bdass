@@ -1,7 +1,11 @@
 package Bdass::GuiPlugin::Job;
-use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable';
+use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable',-signatures;
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
+use Mojo::JSON qw(true false);
+use Bdass::ConnectionPlugin::base;
+use Bdass::Model::DataSource;
+use POSIX qw(strftime);
 
 =head1 NAME
 
@@ -24,21 +28,8 @@ All the methods of L<CallBackery::GuiPlugin::AbstractTable> plus:
 
 =cut
 
-has formCfg => sub {
-    my $self = shift;
-    my $db = $self->user->db;
-
-    return [
-        
-        {
-            key => 'job_title',
-            widget => 'text',
-            label => 'Search',
-            set => {
-                placeholder => 'Job Title',
-            },
-        },
-    ]
+has formCfg => sub ($self) {
+    return [];
 };
 
 =head2 tableCfg
@@ -46,37 +37,69 @@ has formCfg => sub {
 
 =cut
 
-has tableCfg => sub {
-    my $self = shift;
+has tableCfg => sub ($self) {
     return [
         {
             label => trm('Id'),
             type => 'number',
             width => '1*',
             key => 'job_id',
-            sortable => $self->true,
-            primary => $self->true
+            sortable => true,
+            primary => true,
+        },
+        (
+            $self->user->may('admin') 
+            ?  {
+                label => trm('User'),
+                type => 'text',
+                width => '2*',
+                key => 'cbuser_login',
+                sortable => true,
+                primary => true,
+            } 
+            : ()
+        ),
+        {
+            label => trm('Status'),
+            type => 'string',
+            width => '2*',
+            key => 'js_name',
+            sortable => true,
+        },
+        {
+            label => trm('Size'),
+            type => 'text',
+            width => '2*',
+            key => 'job_size',
+            sortable => true,
+        },
+        {
+            label => trm('Server'),
+            type => 'text',
+            width => '2*',
+            key => 'job_server',
+            sortable => true,
         },
         {
             label => trm('Src'),
             type => 'string',
-            width => '6*',
+            width => '4*',
             key => 'job_src',
-            sortable => $self->true,
+            sortable => true,
         },
         {
             label => trm('Dst'),
             type => 'string',
-            width => '6*',
+            width => '4*',
             key => 'job_dst',
-            sortable => $self->true,
+            sortable => true,
         },
         {
             label => trm('Created'),
             type => 'string',
-            width => '2*',
+            width => '3*',
             key => 'job_ts_created',
-            sortable => $self->true,
+            sortable => true,
         }
      ]
 };
@@ -87,106 +110,103 @@ Only users who can write get any actions presented.
 
 =cut
 
-has actionCfg => sub {
-    my $self = shift;
-    return [] if $self->user and not $self->user->may('write');
-
+has actionCfg => sub ($self) {
     return [
-        {
-            label => trm('Create Job'),
-            action => 'popup',
-            addToContextMenu => $self->false,
-            name => 'newJobAdd',
-            popupTitle => trm('New job'),
-            set => {
-                minHeight => 500,
-                minWidth => 800
+        ( (not $self->user or $self->user->may('write') )
+        ? (
+            {
+                label => trm('Create Job'),
+                action => 'popup',
+                addToContextMenu => false,
+                name => 'createJob',
+                popupTitle => trm('Create Archive Job'),
+                backend => {
+                    plugin => 'JobForm'
+                }, 
+                set => {
+                    minWidth => 500,
+                    maxWidth => 500,
+                    minHeight => 500,
+                    maxHeight => 500,
+                }
             },
-            backend => {
-                plugin => 'NewJob',
-                config => {
-                    type => 'add'
+            {
+                label => trm('Remove Job'),
+                action => 'submitVerify',
+                question => trm('Do you really want to remove the selected Job?'),
+                addToContextMenu => true,
+                key => 'removeJob',
+                actionHandler => sub ($self,$form) {
+                    my $subpro = Mojo::Promise->new;
+                    $self->user->mojoSqlDb->delete('job',{
+                        job_id => $form->{selection}{job_id},
+                        job_cbuser => $self->user->userId
+                    },sub ($db,$error,$result) {
+                        use Data::Dumper;
+                        warn Dumper $result->rows,$form;
+                        if ($error){
+                            return $subpro->reject($error);
+                        }
+                        return $subpro->resolve({
+                            action => 'reload'
+                        });
+                    });
+                    return $subpro;
                 }
             }
-        },
-        # {
-        #     action => 'separator'
-        # },
-        # {
-        #     label => trm('Edit'),
-        #     action => 'popup',
-        #     addToContextMenu => $self->true,
-        #     defaultAction => $self->true,
-        #     name => 'jobFormEdit',
-        #     popupTitle => trm('Edit job'),
-        #     backend => {
-        #         plugin => 'JobForm',
-        #         config => {
-        #             type => 'edit'
-        #         }
-        #     }
-        # },
-        # {
-        #     label => trm('Delete'),
-        #     action => 'submitVerify',
-        #     addToContextMenu => $self->true,
-        #     question => trm('Do you really want to delete the selected job '),
-        #     key => 'delete',
-        #     handler => sub {
-        #         my $args = shift;
-        #         my $id = $args->{selection}{job_id};
-        #         die mkerror(4992,"You have to select a job first")
-        #             if not $id;
-        #         my $db = $self->user->db;
-        #         if ($db->deleteData('job',$id) == 1){
-        #             return {
-        #                  action => 'reload',
-        #             };
-        #         }
-        #         die mkerror(4993,"Faild to remove job $id");
-        #         return {};
-        #     }
-        # }
+        ) : () ),
+        {
+            label => trm('Reload'),
+            action => 'submit',
+            addToContextMenu => false,
+            key => 'reload',
+            actionHandler => sub {
+                return {
+                    action => 'reload'
+                }
+            }
+        }
     ];
 };
 
-sub dbh {
-    shift->user->mojoSqlDb->dbh;
-};
-
-sub _getFilter {
-    my $self = shift;
-    my $search = shift;
-    my $filter = '';
-    if ( $search ){
-        $filter = "WHERE job_title LIKE ".$self->dbh->quote('%'.$search);
-    }
-    return $filter;
+sub db ($self) {
+    $self->user->mojoSqlDb;
 }
 
-sub getTableRowCount {
-    my $self = shift;
-    my $args = shift;
-    my $filter = $self->_getFilter($args->{formData}{job_title});
-    return ($self->dbh->selectrow_array("SELECT count(job_id) FROM job $filter"))[0];
+sub getTableRowCount ($self,$args,@opts) {
+    my $userFilter = $self->user->may('admin') ? undef : {
+        job_cbuser => $self->user->userId
+    };
+    return ($self->db->select('job',[\'count(job_id) AS count'],$userFilter)->hash->{count});
 }
 
-sub getTableData {
-    my $self = shift;
-    my $args = shift;
-    my $filter = $self->_getFilter($args->{formData}{job_title});
-    my $SORT ='';
+sub getTableData ($self,$args,@opts) {
+    my %SORT;
+    my $userFilter = $self->user->may('admin') ? undef : {
+        job_cbuser => $self->user->userId
+    };
     if ($args->{sortColumn}){
-        $SORT = 'ORDER BY '.$self->dbh->quote_identifier($args->{sortColumn});
-        $SORT .= $args->{sortDesc} ? ' DESC' : ' ASC';
+        $SORT{order_by} = {
+            ($args->{sortDesc} ? '-desc' : '-asc')
+             => $args->{sortColumn}
+        };
     }
-    return $self->dbh->selectall_arrayref(<<"SQL",{Slice => {}}, $args->{lastRow}-$args->{firstRow}+1,$args->{firstRow});
-SELECT *
-FROM job
-$filter
-$SORT
-LIMIT ? OFFSET ?
-SQL
+
+    $SORT{limit} = $args->{lastRow}-$args->{firstRow}+1;
+    $SORT{offset} = $args->{firstRow};
+
+    my $data = $self->db->select(
+        ['job' 
+            => ['js' => 'js_id','job_js'] 
+            => ['cbuser' => 'cbuser_id', 'job_cbuser'],
+        ],
+        ['job.*','js_name','cbuser_login'],$userFilter,\%SORT
+    )->hashes->each(sub ($el,$id) {
+        $el->{job_ts_created} 
+            = strftime('%Y-%m-%d %H:%M:%S',localtime($el->{job_ts_created}));
+        $el->{job_size} = sprintf("%.1e",$el->{job_size});
+    })->to_array;
+    return $data;
 }
 
 1;

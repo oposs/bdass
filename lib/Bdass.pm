@@ -1,8 +1,12 @@
 package Bdass;
 
-use Mojo::Base 'CallBackery';
+use Mojo::Base 'CallBackery', -signatures;
 use Bdass::Model::Config;
 use Bdass::Model::User;
+use Bdass::Model::DataSource;
+use SQL::Abstract::Pg;
+use Bdass::Command::jobrunner;
+use Mojo::IOLoop::Subprocess;
 
 =head1 NAME
 
@@ -31,17 +35,20 @@ use our own plugin directory and our own configuration file:
 
 =cut
 
-has config => sub {
-    my $self = shift;
+has config => sub ($self) {
     my $config = Bdass::Model::Config->new(app=>$self);
     $config->file($ENV{Bdass_CONFIG} || $self->home->rel_file('etc/bdass.cfg'));
     unshift @{$config->pluginPath}, 'Bdass::GuiPlugin';
     return $config;
 };
 
-has database => sub {
-    my $self = shift;
-    my $database = $self->SUPER::database(@_);
+has database => sub ($self,@args) {
+    my $database = $self->SUPER::database(@args);
+    $database->sql->abstract(
+        SQL::Abstract::Pg->new(
+            name_sep => '.', 
+            quote_char => '"'
+    ));
     $database->sql->migrations
         ->name('BdassBaseDB')
         ->from_data(__PACKAGE__,'appdb.sql')
@@ -49,17 +56,19 @@ has database => sub {
     return $database;
 };
 
-sub startup {
-    my $app = shift;
-    $app->config->cfgHash; # read and validate config
-    unshift @{$app->commands->namespaces},  __PACKAGE__.'::Command';
-    $app->SUPER::startup(@_);
+has dataSource => sub ($app) {
+    Bdass::Model::DataSource->new(app=>$app);
 };
 
 has userObject => sub {
     Bdass::Model::User->new;
 };
 
+sub startup ($app) {
+    $app->config->cfgHash; # read and validate config
+    unshift @{$app->commands->namespaces},  __PACKAGE__.'::Command';
+    $app->SUPER::startup(@_);
+};
 
 1;
 
@@ -88,14 +97,24 @@ CREATE TABLE IF NOT EXISTS js (
 );
 
 INSERT INTO js
-    VALUES (1,'new'),(2,'approved'),
-    (3,'processing'),(4,'archived'),
-    (5,'cancled'),(6,'denied');
+    VALUES 
+    (1,'new'),
+    (2,'sizing'),
+    (3,'sized'),
+    (4,'authorized'),
+    (5,'archiving'),
+    (6,'complete'),
+    (7,'error');
     
 CREATE TABLE IF NOT EXISTS job (
     job_id  INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_js INTEGER REFERENCES js(js_id) DEFAULT 1,
     job_cbuser INTEGER NOT NULL REFERENCES cbuser(cbuser_id),
+    job_server TEXT NOT NULL,
     job_src TEXT NOT NULL,
+    job_token_ts TIMESTAMP NOT NULL,
     job_dst TEXT,
+    job_note TEXT,
+
     job_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'))
 );
