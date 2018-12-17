@@ -47,7 +47,7 @@ has formCfg => sub {
         {
             widget => 'header',
             label => trm('Archive Job Creation'),
-            note => trm('In Older to register a folder for archiving, you have to prove that you have write access to it. You do this by creating archive token file in the folder you want to get archived. Every user has a unique archive token filename. You find yours on the line below.'),
+            note => trm('In order to register a folder for archiving, you have to prove that you have write access to it. You do this by creating archive token file in the folder you want to get archived. Every user has a unique archive token filename. You find yours on the line below.'),
         },
 
         {
