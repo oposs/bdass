@@ -35,6 +35,33 @@ has log => sub { shift->app->log };
 
 has cfg => sub { shift->app->config->cfgHash->{CONNECTION} };
 
+sub sizeJobs ($self,$jobs) {
+    my @allJobs;
+    for my $jp (@$jobs){
+        push @allJobs, $jp->then(sub ($job) {
+            $self->app->log->debug("Job $job->{job_id} -> $job->{job_size}");
+            return undef;
+        })->catch(sub ($err) {
+            $self->app->log->error("sub ".$err);
+            return undef;
+        });
+    }
+    return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
+}
+
+sub transferJobs ($self,$jobs) {
+    my @allJobs;
+    for my $jp (@$jobs){
+        push @allJobs, $jp->then(sub ($result) {
+            $self->app->log->debug($result);
+            return undef;
+        })->catch(sub ($err) {
+            $self->app->log->error("sub ".$err);
+            return undef;
+        });
+    }
+    return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
+};
 
 sub run {
     my $self   = shift;
@@ -42,21 +69,15 @@ sub run {
     GetOptions(\%opt,
             'verbose|v');
     my $data = Bdass::Model::DataSource->new(app=>$self->app);
-    $data->sizeNewJobs->then(sub ($jobs) {
-        my @allJobs;
-        for my $jp (@$jobs){
-            push @allJobs, $jp->then(sub ($job) {
-                $self->app->log->debug("Job $job->{job_id} -> $job->{job_size}");
-                return undef;
-            })->catch(sub ($err) {
-                $self->app->log->error("sub ".$err);
-                return undef;
-            });
-        }
-        return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
-    })->catch(sub ($err) {
-        $self->app->log->error("big ".$err);
+    Mojo::Promise->all(
+        $data->sizeNewJobs->then(sub ($jobs) { $self->sizeJobs($jobs)} ),
+        $data->transferData->then(sub ($jobs) { $self->transferJobs($jobs) }),
+    )->then(sub {
+        $self->app->log->info("DONE");
+    })->catch(sub ($error) {
+        $self->app->log->error($error);
     })->wait;
 }
+
 
 1;

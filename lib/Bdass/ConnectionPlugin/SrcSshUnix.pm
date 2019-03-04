@@ -49,6 +49,7 @@ my %sshCache;
 my $sshId = 'a';
 
 sub checkFolder ($self,$path,$token=undef) {
+    checkPath($path);
     my $sshCachKey = $sshId++;
     my $ssh = $sshCache{$sshCachKey} = Mojo::IOLoop::ReadWriteFork->new;
     my $promise = Mojo::Promise->new;
@@ -99,6 +100,7 @@ sub checkFolder ($self,$path,$token=undef) {
 
 
 sub sizeFolder ($self,$path) {
+    checkPath($path);
     my $sshCachKey = $sshId++;
     my $ssh = $sshCache{$sshCachKey} = Mojo::IOLoop::ReadWriteFork->new;
     my $promise = Mojo::Promise->new;
@@ -141,6 +143,50 @@ sub sizeFolder ($self,$path) {
         }
     });
     return $promise;
+}
+
+sub streamFolder ($self,$path) {
+    checkPath($path);
+    my $sshCachKey = $sshId++;
+    my $ssh = $sshCache{$sshCachKey} = Mojo::IOLoop::ReadWriteFork->new;
+    my $ee = Mojo::EventEmitter->new;
+    # Emitted when the child completes
+    $ssh->on(error => sub ($ssh,$error) { 
+        $self->log->error("ssh died $error");
+        $ee->emit(error => $error);
+        delete $sshCache{$sshCachKey};
+    });
+    # Emitted when the child completes
+    $ssh->on(close => sub ($ssh, $exit_value, $signal) { 
+        $self->log->debug("close event exit $exit_value, signal $signal");
+        delete $sshCache{$sshCachKey};
+        if ($exit_value) {
+            return $ee->emit(error => "ssh session closed with exit value $exit_value");
+        }
+        $self->log->error("ssh closed with signal $signal and exit value $exit_value");
+        return $ee->emit(complete => "transfer complete");
+    });
+    $ssh->on(read => sub ($ssh,$buff) {
+        $ee->emit(read => $buff);
+    });
+    $ssh->start({
+        program => "ssh",
+        program_args => [
+            $self->url->host,
+            "tar cf - '$path' 2> /dev/null"
+        ],
+        conduit => 'pipe',
+        env => {
+            $ENV{SSH_AUTH_SOCK} ? (SSH_AUTH_SOCK => $ENV{SSH_AUTH_SOCK}) :()
+        }
+    });
+    return $ee;
+}
+
+sub checkPath ($path) {
+    if ($path =~ /[;()=^']/){
+        die "Bad PATH detected!";
+    }
 }
 
 1;

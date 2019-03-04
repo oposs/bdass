@@ -57,32 +57,91 @@ sub checkConnections ($self) {
     });
 }
 
-=head3 addArchiveJob ($self,$user,$server,$path)
+=head3 addArchiveJob ($self,{server,path,token})
 
 Add an ArchiveJob request. Returns a promise.
 
 =cut
 
 sub addArchiveJob ($self,$args) {
-    $self->checkPath($args->{server},$args->{path},$args->{user}->userToken)->then(sub ($data) {
-        my $pro = Mojo::Promise->new;
-        $args->{user}->mojoSqlDb->insert('job',{
-            job_cbuser => $args->{user}->userId,
-            job_server => $args->{server},
-            job_note => $args->{note},
-            job_src => $data->{path},
-            job_token_ts => $data->{ts}
-        },sub ($db,$error,$result) {
-            if ($error){
-                return $pro->reject($error);
-            }
-            if ($result and $result->last_insert_id){
-                return $pro->resolve($result->last_insert_id);
-            }
-            return $pro->reject("failed to insert job");
+    $self->checkPath($args->{server},$args->{path},$args->{token})->then(
+        sub ($data) {
+            my $db = $args->{user}->mojoSqlDb;
+            my $tx = $db->begin;
+            my $pro = Mojo::Promise->new;
+            $db->insert('job',{
+                job_cbuser => $args->{user}->userId,
+                job_token => $args->{token},
+                job_server => $args->{server},
+                job_note => $args->{note},
+                job_src => $data->{path},
+            },sub ($db,$error,$result) {
+                if ($error){
+                    return $pro->reject($error);
+                }
+                if ($result and $result->last_insert_id){
+                    return $self->recordHistory({
+                        db => $db,
+                        job => $result->last_insert_id,
+                        cbuser => $args->{user}->userId,
+                        js => 1,
+                        note => "Job created"
+                    })->then(sub {
+                        $tx->commit;
+                        return $pro->resolve("job recorded");
+                    },sub ($error) {
+                        return $pro->reject($error);
+                    });
+                };
+                return $pro->reject("Failed to insert Job");
+            });
+            return $pro;
+        }
+    );
+}
+
+=head3 recordDecision ($self,$args)
+
+Record decision on archive job
+
+=cut
+
+sub recordDecision ($self,$args) {
+    my $pro = Mojo::Promise->new;
+
+    if (!$args->{user}->may('admin')){
+        return $pro->reject("No Permission to grant/reject Jobs");
+    }
+    my $db = $args->{user}->mojoSqlDb;
+    my $tx = $db->begin;
+    $db->update('job',
+    {
+        job_js => $args->{js},
+        job_decision => $args->{decision},
+        job_ts_updated => time,
+        job_dst => $args->{dst}
+    },
+    {
+        job_id => $args->{job},
+        job_js => [3,4,8], # sized
+    },sub ($db,$error,$result) {
+        if ($error){
+            return $pro->reject("Updating job $args->{id}: $error");
+        }
+        $self->recordHistory({
+            db => $db,
+            job => $args->{job},
+            cbuser => $args->{user}->userId,
+            js => $args->{js},
+            note => $args->{dst} . " - " .$args->{decision}
+        })->then(sub {
+            $tx->commit;
+            return $pro->resolve("new entry recorded");
+        },sub ($error) {
+            return $pro->reject("recording history: $error");
         });
-        return $pro;
     });
+    return $pro;
 }
 
 =head3 sizeNewJobs ($self)
@@ -94,7 +153,6 @@ Query the database for jobs not yet sized.
 sub sizeNewJobs ($self) {
     my $mainpro = Mojo::Promise->new;
     my $sql = $self->app->database->sql;
-
     $sql->db->select('job',undef,{
         job_js => 1
     },sub ($db,$error,$result) {
@@ -106,9 +164,7 @@ sub sizeNewJobs ($self) {
 
     return $mainpro->then(sub ($hashes) {
         my @jobs;
-
         for my $job (@{$hashes->to_array}) {
-
             my $plugin = $self->cfg->{CONNECTION}{$job->{job_server}}{plugin};
             my $pro = Mojo::Promise->new;
 
@@ -157,6 +213,117 @@ sub sizeNewJobs ($self) {
         }
         return \@jobs;
     });
+}
+
+sub transferData ($self) {
+    my $mainpro = Mojo::Promise->new;
+    my $sql = $self->app->database->sql;
+
+    $sql->db->select('job',undef,{
+        job_js => 4
+    },sub ($db,$error,$result) {
+        if ($error){
+            return $mainpro->reject($error);
+        }
+        return $mainpro->resolve($result->hashes);
+    });
+    return $mainpro->then(sub ($hashes) {
+        my @jobs;
+
+        for my $job (@{$hashes->to_array}) {
+
+            my $plugin = $self->cfg->{CONNECTION}{$job->{job_server}}{plugin};
+            my $pro = Mojo::Promise->new;
+            my $sum = 0;
+            my $where = { 
+                job_id => $job->{job_id}
+            };
+
+            $sql->db->update('job',{
+                job_js => 5
+            },$where,sub ($db,$error,$result) {
+                if ($error){
+                    return $pro->reject($error);
+                }
+                return $pro->resolve($result);
+            });
+            
+            push @jobs, $pro->then(sub {
+                my $subpro = Mojo::Promise->new;
+                open my $fh, "> :raw", $job->{job_dst}."/job_".$job->{job_id}.".tar" 
+                    or die "opening job tar: $!";
+                my $em = $plugin->streamFolder($job->{job_src});
+                $em->on(error => sub ($em,@msgs) {
+                    $subpro->reject(@msgs);
+                });
+                $em->on(read => sub ($em,@data) {
+                    $sum += length($data[0]);
+                    print $fh $data[0] or return $subpro->reject($!);
+                });
+                $em->on(complete => sub ($em,@data) {
+                    my $db = $sql->db;
+                    my $tx = $db->begin;
+                    $sql->db->update('job',{
+                        job_js => 6
+                    },$where,sub ($db,$error,$result) {
+                        if ($error){
+                            return $subpro->reject($error);
+                        }
+                        my $note = "Transfer $job->{job_server} complete $sum Bytes";
+                        $self->recordHistory({
+                            db => $db,
+                            job => $job->{job_id},
+                            js => 6,
+                            note => $note
+                        })->then(sub {
+                            close($fh) or return $subpro->reject($!);
+                            $tx->commit;
+                            return $subpro->resolve($note);
+                        },sub ($error) {
+                            return $subpro->reject("recording history: $error");
+                        });
+                    });
+                });
+                return $subpro;
+            })->catch( sub ($err) {
+                my $subpro = Mojo::Promise->new;
+                $sql->db->update('job',{
+                    job_js => 4
+                },$where,sub ($db,$error,$result) {
+                    if ($error){
+                        return $subpro->reject($error);
+                    }
+                    return $subpro->reject($err);
+                });
+                return $subpro;
+            });
+        }
+        return \@jobs;
+    });
+}
+
+=head3 recordHistory ($self,$job,$user,$js,$desc)
+
+Update history log
+
+=cut
+
+sub recordHistory ($self,$args) {
+    $self->log->debug("start record");
+    my $pro = Mojo::Promise->new;
+    $args->{db}->insert('history',{
+        history_job => $args->{job},
+        history_cbuser => $args->{cbuser},
+        history_ts => time,
+        history_js => $args->{js},
+        history_note => $args->{note}
+    },sub ($db,$error,$result) {
+        if ($error){
+            return $pro->reject($error);
+        }
+        return $pro->resolve("decision recorded");
+    });
+    return $pro;
 }
 
 1;

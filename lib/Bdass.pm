@@ -104,18 +104,29 @@ INSERT INTO js
     (4,'authorized'),
     (5,'archiving'),
     (6,'complete'),
-    (7,'error');
+    (7,'error'),
+    (8,'denied');
     
 CREATE TABLE IF NOT EXISTS job (
     job_id  INTEGER PRIMARY KEY AUTOINCREMENT,
     job_js INTEGER REFERENCES js(js_id) DEFAULT 1,
+    job_token TEXT NOT NULL UNIQUE,
     job_cbuser INTEGER NOT NULL REFERENCES cbuser(cbuser_id),
     job_server TEXT NOT NULL,
     job_size INTEGER,
     job_src TEXT NOT NULL,
-    job_token_ts TIMESTAMP NOT NULL,
     job_dst TEXT,
     job_note TEXT,
+    job_decision TEXT,
+    job_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')),
+    job_ts_updated TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'))
+);
 
-    job_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'))
+CREATE TABLE IF NOT EXISTS history (
+    history_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    history_job INTEGER NOT NULL REFERENCES job(job_id) ON DELETE CASCADE,
+    history_cbuser INTEGER REFERENCES cbuser(cbuser_id),
+    history_ts TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')),
+    history_js INTEGER NOT NULL REFERENCES js(js_id),
+    history_note TEXT
 );

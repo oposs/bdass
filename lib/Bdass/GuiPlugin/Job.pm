@@ -95,6 +95,13 @@ has tableCfg => sub ($self) {
             sortable => true,
         },
         {
+            label => trm('Note'),
+            type => 'string',
+            width => '4*',
+            key => 'job_note',
+            sortable => true,
+        },
+        {
             label => trm('Created'),
             type => 'string',
             width => '3*',
@@ -154,6 +161,25 @@ has actionCfg => sub ($self) {
                     return $subpro;
                 }
             }
+        ) : () ),
+        ( (not $self->user or $self->user->may('admin') )
+        ? (
+            {
+                label => trm('Decide Job'),
+                action => 'popup',
+                addToContextMenu => false,
+                name => 'decideJob',
+                popupTitle => trm('Decide Job'),
+                backend => {
+                    plugin => 'JobDecisionForm'
+                }, 
+                set => {
+                    minWidth => 500,
+                    maxWidth => 500,
+                    minHeight => 600,
+                    maxHeight => 600,
+                }
+            },
         ) : () ),
         {
             label => trm('Reload'),
