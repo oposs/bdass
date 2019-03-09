@@ -3,7 +3,7 @@
 AUTOMAKE_OPTIONS =  foreign
 
 
-SUBDIRS = thirdparty lib etc frontend bin
+SUBDIRS = lib thirdparty etc frontend bin
 
 PUB := $(shell find public -type d -name ".??*" -prune -o -not -name ".*" -a -not -name "*~" -a -not -name "*.tmp"  -a -type f -print )
 

@@ -1,7 +1,7 @@
 
 AUTOMAKE_OPTIONS=foreign
 
-EXTRA_DIST = config.json Manifest.json source/index.html 	$(shell find source/class source/resource source/translation -type d \( -name ".??*" -o -name "build" \) -prune -o -not -name ".*" -a -not -name "*~" -a -not -name "*.tmp"  -a -type f -print )
+EXTRA_DIST = config.json Manifest.json source/index.html $(shell find source/class source/resource source/translation -type d \( -name ".??*" -o -name "build" \) -prune -o -not -name ".*" -a -not -name "*~" -a -not -name "*.tmp"  -a -type f -print )
 
 if BUILD_QOOXDOO_APP
 
