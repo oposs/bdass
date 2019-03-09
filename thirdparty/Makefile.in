@@ -420,7 +420,7 @@ distclean-local:
 	ls -1 | grep -v Makefile | xargs rm -rf
 
 install-exec-hook:
-	[ ! -d lib/perl5 ] || cp -fr lib/perl5/* $(DESTDIR)$(libdir)
+	[ ! -d lib/perl5 ] || mkdir -p $(DESTDIR)$(libdir) && cp -fr lib/perl5/* $(DESTDIR)$(libdir)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
