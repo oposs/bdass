@@ -68,7 +68,13 @@ has tableCfg => sub ($self) {
         },
         {
             label => trm('Size'),
-            type => 'text',
+            type => 'num',
+            format => {
+                unitPrefix => 'metric',
+                maximumFractionDigits => 2,
+                postfix => 'Byte',
+                locale => 'en'
+            },
             width => '2*',
             key => 'job_size',
             sortable => true,
@@ -103,7 +109,8 @@ has tableCfg => sub ($self) {
         },
         {
             label => trm('Created'),
-            type => 'string',
+            type => 'date',
+            format => 'yyyy-MM-dd HH:mm:ss Z',
             width => '3*',
             key => 'job_ts_created',
             sortable => true,
@@ -228,9 +235,7 @@ sub getTableData ($self,$args,@opts) {
         ],
         ['job.*','js_name','cbuser_login'],$userFilter,\%SORT
     )->hashes->each(sub ($el,$id) {
-        $el->{job_ts_created} 
-            = strftime('%Y-%m-%d %H:%M:%S',localtime($el->{job_ts_created}));
-        $el->{job_size} = sprintf("%.1e",$el->{job_size});
+        $el->{job_ts_created} = $el->{job_ts_created}*1000;
     })->to_array;
     return $data;
 }
