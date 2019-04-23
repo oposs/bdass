@@ -49,6 +49,9 @@ has grammar => sub {
     my $gr = $self->SUPER::grammar;
     push @{$gr->{_sections}},'CONNECTION';
     push @{$gr->{_mandatory}},'CONNECTION';
+    push @{$gr->{BACKEND}{_vars}},'ad_uri';
+    push @{$gr->{BACKEND}{_mandatory}},'ad_uri';
+    $gr->{BACKEND}{ad_uri} = { _doc => 'AD URI - ldap://ad1.company.com'};
     $gr->{CONNECTION} = {
         _vars => [],
         _sections => ['/\S+/'],

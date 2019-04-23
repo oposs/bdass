@@ -65,6 +65,7 @@ has userObject => sub {
 };
 
 sub startup ($app) {
+    $app->plugin('SPNEGO',ad_server => $app->config->cfgHash->{BACKEND}{ad_uri});
     $app->config->cfgHash; # read and validate config
     unshift @{$app->commands->namespaces},  __PACKAGE__.'::Command';
     $app->SUPER::startup(@_);
@@ -130,3 +131,7 @@ CREATE TABLE IF NOT EXISTS history (
     history_js INTEGER NOT NULL REFERENCES js(js_id),
     history_note TEXT
 );
+
+-- 2 up
+
+ALTER TABLE cbuser ADD cbuser_groups TEXT default '{}';
