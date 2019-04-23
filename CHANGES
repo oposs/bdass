@@ -1,3 +1,9 @@
-0.0.0 2018-04-12  Tobias Oetiker (tobi@oetiker.ch)
+0.4.0 2019-04-23 17:15:11 +0200 Tobias Oetiker <tobi@oetiker.ch>
 
-- started project
+ - new mandatory configuration option ad_uri to configure the address
+   of an active directory server.
+
+0.3.2 2019-04-03 16:13:38 +0200 Tobias Oetiker <tobi@oetiker.ch>
+
+ - added support for formatting number with metric prefix
+

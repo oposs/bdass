@@ -1,7 +1,8 @@
 Mojolicious~8
-CallBackery@0.14.2
+CallBackery@0.16.0
 Mojo::SQLite
 Mojo::IOLoop::ReadWriteFork
+Mojolicious::Plugin::SPNEGO
 Role::Tiny
 PPI
 JSON::Validator

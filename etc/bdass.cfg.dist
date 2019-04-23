@@ -4,6 +4,7 @@ cfg_db = /tmp/bdass.db
 sesame_user = adfadsfasdf4ee3r
 # perl -MDigest::SHA -e 'print Digest::SHA::hmac_sha1_hex("access"),"\n"'
 sesame_pass = 393afhkjhffjj
+ad_uri = ldap://my-ad-Server
 
 *** FRONTEND ***
 logo = ../resource/bdass/logo.png
