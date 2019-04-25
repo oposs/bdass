@@ -37,7 +37,7 @@ dist-hook:
 	echo ' -' >> CHANGES.new
 	echo >> CHANGES.new
 	cat CHANGES >> CHANGES.new && mv CHANGES.new CHANGES
-	$$EDITOR CHANGES
+	[ x$$EDITOR == x ] || $$EDITOR CHANGES
 	cat CHANGES > $(distdir)/CHANGES
 
 test:
