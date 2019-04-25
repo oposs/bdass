@@ -2971,7 +2971,7 @@ else
 fi
 
 
-ac_config_files="$ac_config_files Makefile etc/Makefile lib/Makefile frontend/Makefile thirdparty/Makefile"
+ac_config_files="$ac_config_files Makefile etc/Makefile lib/Makefile bin/Makefile frontend/Makefile thirdparty/Makefile"
 
 
 
@@ -3704,6 +3704,7 @@ do
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "etc/Makefile") CONFIG_FILES="$CONFIG_FILES etc/Makefile" ;;
     "lib/Makefile") CONFIG_FILES="$CONFIG_FILES lib/Makefile" ;;
+    "bin/Makefile") CONFIG_FILES="$CONFIG_FILES bin/Makefile" ;;
     "frontend/Makefile") CONFIG_FILES="$CONFIG_FILES frontend/Makefile" ;;
     "thirdparty/Makefile") CONFIG_FILES="$CONFIG_FILES thirdparty/Makefile" ;;
 
