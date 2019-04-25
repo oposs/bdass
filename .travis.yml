@@ -28,4 +28,5 @@ script:
   - cd bdass-$$(cat VERSION)
   - ./configure --prefix=/tmp/bdass-$$(VERSION)
   - make install
+  - make test
   
