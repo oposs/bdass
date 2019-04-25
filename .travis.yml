@@ -23,6 +23,8 @@ install:
 script:
   - ./bootstrap
   - ./configure --with-qooxdoo-sdk-dir=$(pwd)/qooxdoo-sdk
+  - touch PERL_MODULES
+  - make
   - make dist
   - tar zxf bdass-$(cat VERSION).tar.gz
   - cd bdass-$(cat VERSION)
