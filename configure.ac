@@ -137,7 +137,6 @@ AC_CONFIG_FILES([
     Makefile
     etc/Makefile
     lib/Makefile
-    bin/Makefile
     frontend/Makefile
     thirdparty/Makefile
 ])
