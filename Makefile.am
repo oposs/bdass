@@ -14,7 +14,7 @@ PERLTESTS := $(shell find t -name "*.t")
 
 THIRDPARTY_DIR := $(shell pwd)/thirdparty
 
-EXTRA_DIST = VERSION PERL_MODULES COPYRIGHT LICENSE CHANGES AUTHORS bootstrap $(PUB) 	$(wildcard t/*.t) $(POD) $(TEMPL) $(PERLTESTS) $(SHARE)
+EXTRA_DIST = VERSION PERL_MODULES COPYRIGHT LICENSE CHANGES AUTHORS bootstrap $(PUB) $(wildcard t/*.t) $(POD) $(TEMPL) $(PERLTESTS) $(SHARE)
 
 
 YEAR := $(shell date +%Y)

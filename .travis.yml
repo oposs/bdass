@@ -30,5 +30,6 @@ script:
   - cd bdass-$(cat VERSION)
   - ./configure --prefix=/tmp/bdass-$(cat VERSION)
   - make install
+  - cp etc/bdass.cfg.dist etc/bdass.cfg
   - make test
   
