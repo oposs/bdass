@@ -1,0 +1,31 @@
+sudo: false
+
+language: perl
+
+perl:
+  - "5.26"
+
+cache:
+  directories:
+    - 'thirdparty'
+    - 'qooxdoo-cache'
+    - 'qooxdoo-sdk'
+
+
+before_cache:
+  - 'rm -rf */thirdparty/Makefile* */thirdparty/latest-build */thirdparty/sources */thirdparty/work'
+
+install:
+  - test -d qooxdoo-sdk/framework && ( cd qooxdoo-sdk && git pull ) || true
+  - test -d qooxdoo-sdk/framework || rm -rf qooxdoo-sdk
+  - test -d qooxdoo-sdk || git clone --depth=1 https://github.com/qooxdoo/qooxdoo.git qooxdoo-sdk
+
+script:
+  - ./bootstrap.sh
+  - ./configure --with-qooxdoo-sdk-dir=$$(pwd)/qooxdoo-sdk
+  - make dist
+  - tar zxf bdass-$$(cat VERSION).tar.gz
+  - cd bdass-$$(cat VERSION)
+  - ./configure --prefix=/tmp/bdass-$$(VERSION)
+  - make install
+  
