@@ -52,7 +52,7 @@ Makefile.old
 *.bs
 /_eumm/
 public/
-config.*
+/config.*
 etc/*.cfg
 frontend/cache
 frontend/source/script

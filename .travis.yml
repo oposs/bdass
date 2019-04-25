@@ -21,11 +21,15 @@ install:
   - test -d qooxdoo-sdk || git clone --depth=1 https://github.com/qooxdoo/qooxdoo.git qooxdoo-sdk
 
 script:
-  - ./bootstrap.sh
-  - ./configure --with-qooxdoo-sdk-dir=$$(pwd)/qooxdoo-sdk
+  - ./bootstrap
+  - ./configure --with-qooxdoo-sdk-dir=$(pwd)/qooxdoo-sdk
+  - touch PERL_MODULES
+  - make
   - make dist
-  - tar zxf bdass-$$(cat VERSION).tar.gz
-  - cd bdass-$$(cat VERSION)
-  - ./configure --prefix=/tmp/bdass-$$(VERSION)
+  - tar zxf bdass-$(cat VERSION).tar.gz
+  - cd bdass-$(cat VERSION)
+  - ./configure --prefix=/tmp/bdass-$(cat VERSION)
   - make install
+# - cp etc/bdass.cfg.dist etc/bdass.cfg
+# - make test
   

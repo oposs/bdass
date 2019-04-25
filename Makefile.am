@@ -14,7 +14,7 @@ PERLTESTS := $(shell find t -name "*.t")
 
 THIRDPARTY_DIR := $(shell pwd)/thirdparty
 
-EXTRA_DIST = VERSION PERL_MODULES COPYRIGHT LICENSE CHANGES AUTHORS bootstrap $(PUB) 	$(wildcard t/*.t) $(POD) $(TEMPL) $(PERLTESTS) $(SHARE)
+EXTRA_DIST = VERSION PERL_MODULES COPYRIGHT LICENSE CHANGES AUTHORS bootstrap $(PUB) $(wildcard t/*.t) $(POD) $(TEMPL) $(PERLTESTS) $(SHARE)
 
 
 YEAR := $(shell date +%Y)
@@ -37,7 +37,7 @@ dist-hook:
 	echo ' -' >> CHANGES.new
 	echo >> CHANGES.new
 	cat CHANGES >> CHANGES.new && mv CHANGES.new CHANGES
-	$$EDITOR CHANGES
+	[ x$$EDITOR == x ] || $$EDITOR CHANGES
 	cat CHANGES > $(distdir)/CHANGES
 
 test:
