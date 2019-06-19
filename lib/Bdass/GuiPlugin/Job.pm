@@ -126,49 +126,46 @@ Only users who can write get any actions presented.
 
 has actionCfg => sub ($self) {
     return [
-        ( (not $self->user or $self->user->may('write') )
-        ? (
-            {
-                label => trm('Create Job'),
-                action => 'popup',
-                addToContextMenu => false,
-                name => 'createJob',
-                popupTitle => trm('Create Archive Job'),
-                backend => {
-                    plugin => 'JobForm'
-                }, 
-                set => {
-                    minWidth => 500,
-                    maxWidth => 500,
-                    minHeight => 500,
-                    maxHeight => 500,
-                }
-            },
-            {
-                label => trm('Remove Job'),
-                action => 'submitVerify',
-                question => trm('Do you really want to remove the selected Job?'),
-                addToContextMenu => true,
-                key => 'removeJob',
-                actionHandler => sub ($self,$form) {
-                    my $subpro = Mojo::Promise->new;
-                    $self->user->mojoSqlDb->delete('job',{
-                        job_id => $form->{selection}{job_id},
-                        job_cbuser => $self->user->userId
-                    },sub ($db,$error,$result) {
-                        use Data::Dumper;
-                        warn Dumper $result->rows,$form;
-                        if ($error){
-                            return $subpro->reject($error);
-                        }
-                        return $subpro->resolve({
-                            action => 'reload'
-                        });
-                    });
-                    return $subpro;
-                }
+        {
+            label => trm('Create Job'),
+            action => 'popup',
+            addToContextMenu => false,
+            name => 'createJob',
+            popupTitle => trm('Create Archive Job'),
+            backend => {
+                plugin => 'JobForm'
+            }, 
+            set => {
+                minWidth => 500,
+                maxWidth => 500,
+                minHeight => 500,
+                maxHeight => 500,
             }
-        ) : () ),
+        },
+        {
+            label => trm('Remove Job'),
+            action => 'submitVerify',
+            question => trm('Do you really want to remove the selected Job?'),
+            addToContextMenu => true,
+            key => 'removeJob',
+            actionHandler => sub ($self,$form) {
+                my $subpro = Mojo::Promise->new;
+                $self->user->mojoSqlDb->delete('job',{
+                    job_id => $form->{selection}{job_id},
+                    job_cbuser => $self->user->userId
+                },sub ($db,$error,$result) {
+                    use Data::Dumper;
+                    warn Dumper $result->rows,$form;
+                    if ($error){
+                        return $subpro->reject($error);
+                    }
+                    return $subpro->resolve({
+                        action => 'reload'
+                    });
+                });
+                return $subpro;
+            }
+        },
         ( (not $self->user or $self->user->may('admin') )
         ? (
             {

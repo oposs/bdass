@@ -141,9 +141,6 @@ has actionCfg => sub ($self) {
     ];
 };
 
-has checkAccess => sub ($self) {
-    return $self->user->may('write');
-};
 
 1;
 

@@ -158,7 +158,7 @@ has actionCfg => sub ($self) {
 };
 
 has checkAccess => sub ($self) {
-    return $self->user->may('write');
+    return $self->user->may('admin');
 };
 
 =head1 METHODS

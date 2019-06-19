@@ -38,6 +38,7 @@ use our own plugin directory and our own configuration file:
 has config => sub ($self) {
     my $config = Bdass::Model::Config->new(app=>$self);
     $config->file($ENV{Bdass_CONFIG} || $self->home->rel_file('etc/bdass.cfg'));
+    
     unshift @{$config->pluginPath}, 'Bdass::GuiPlugin';
     return $config;
 };
@@ -65,8 +66,15 @@ has userObject => sub {
 };
 
 sub startup ($app) {
-    $app->plugin('SPNEGO',ad_server => $app->config->cfgHash->{BACKEND}{ad_uri});
-    $app->config->cfgHash; # read and validate config
+    my $cfg = $app->config->cfgHash;
+    my %TLS;
+    if (my $tls = $cfg->{BACKEND}{ad_tls}){
+        %TLS = ( start_tls => $tls );
+    }
+    $app->plugin('SPNEGO',
+        ad_server => $cfg->{BACKEND}{ad_uri},
+        %TLS
+    );
     unshift @{$app->commands->namespaces},  __PACKAGE__.'::Command';
     $app->SUPER::startup(@_);
 };
