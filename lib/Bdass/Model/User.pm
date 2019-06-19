@@ -12,7 +12,9 @@ use Mojo::Util qw(b64_encode sha1_sum dumper);
 use Mojo::JSON qw(encode_json decode_json);
 
 has userId => sub {
-    shift->userInfo->{cbuser_id};
+    my $self = shift;
+    my $ui = $self->userInfo;
+    return ref $ui ? $ui->{cbuser_id} : undef;
 };
 
 sub provisionOrUpdateUser {
@@ -40,7 +42,22 @@ sub provisionOrUpdateUser {
     },$data->{id} ? { id => int($data->{id}) } : ());
 }
 
-has userInfo => sub {
+sub may {
+    my $self = shift;
+    my $perm = shift;
+    my $groups = $self->userInfo->{groups};
+    my $admin_group = $self->app->config->cfgHash->{BACKEND}{admin_group};
+    for ($perm) {
+        /^admin$/ && do {
+            if ($groups->{$admin_group}) {
+                return 1;
+            }
+        };
+    }
+    return 0;
+}
+
+has userInfo => sub  {
     my $self = shift;
     my $userId = $self->cookieConf->{u};
     if (not $userId) {
@@ -50,7 +67,7 @@ has userInfo => sub {
                 my $user = shift;
                 my $ldap = shift; # bound Net::LDAP::SPNEGO connection
                 my $groups = $ldap->get_ad_groups($user->{samaccountname});
-                $self->log->debug(dumper $groups);
+                # $self->log->debug(dumper $groups);
                 $userId = $self->provisionOrUpdateUser($user,$groups);
                 return 1; # 1 is you are happy with the outcome
             }
@@ -58,9 +75,14 @@ has userInfo => sub {
     }
     # prevent recursion by already setting the userId
     $self->userId($userId);
+    # we are in 
+    $self->log->debug("Hello $userId");
 
     my $info = $self->db->fetchRow('cbuser',{id=>$self->userId});
     $info->{sessionCookie} = $self->makeSessionCookie();
+    $info->{groups} = { map {
+        $_ => 1 } keys %{decode_json($info->{cbuser_groups})}
+    };
     delete $info->{cbuser_groups};
     return $info;
 };

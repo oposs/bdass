@@ -5,6 +5,10 @@ sesame_user = adfadsfasdf4ee3r
 # perl -MDigest::SHA -e 'print Digest::SHA::hmac_sha1_hex("access"),"\n"'
 sesame_pass = 393afhkjhffjj
 ad_uri = ldap://my-ad-Server
+admin_group = Remote Desktop Users
++ad_tls
+verify = none
+# see https://metacpan.org/pod/Net::LDAP#start_tls-(-OPTIONS-) for more OPTIONS
 
 *** FRONTEND ***
 logo = ../resource/bdass/logo.png
