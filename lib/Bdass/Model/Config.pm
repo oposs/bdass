@@ -55,7 +55,7 @@ has grammar => sub {
     $gr->{BACKEND}{admin_group} = { _doc => 'admin group from AD'};
     push @{$gr->{BACKEND}{_sections}},'ad_tls';
     push @{$gr->{BACKEND}{ad_tls}{_vars}}, 
-        qw(verify sslversion sslserver ciphers clientcert clientkey);
+        qw(verify sslversion sslserver ciphers clientcert clientkey keydecrypt capath cafile checkcrl);
     $gr->{CONNECTION} = {
         _vars => [],
         _sections => ['/\S+/'],
