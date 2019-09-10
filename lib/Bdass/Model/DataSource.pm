@@ -3,6 +3,7 @@ package Bdass::Model::DataSource;
 use Mojo::Base -base,-signatures;
 use Time::HiRes qw(gettimeofday);
 use Mojo::Util qw(dumper);
+use Mojo::File;
 
 =head1 NAME
 
@@ -23,6 +24,7 @@ has cfg => sub {
     shift->app->config->cfgHash;
 };
 
+has jsHid2Id => sub { shift->app->jsHid2Id };
 
 =head3 checkPath($key,$path,$token)
 
@@ -123,7 +125,7 @@ sub recordDecision ($self,$args) {
     },
     {
         job_id => $args->{job},
-        job_js => [3,4,8], # sized
+        job_js => [@{$self->jsHid2Id}{qw(sized approved denied)}], # sized
     },sub ($db,$error,$result) {
         if ($error){
             return $pro->reject("Updating job $args->{id}: $error");
@@ -152,9 +154,10 @@ Query the database for jobs not yet sized.
 
 sub sizeNewJobs ($self) {
     my $mainpro = Mojo::Promise->new;
+    my $jsHid2Id = $self->app->jsHid2Id;
     my $sql = $self->app->database->sql;
     $sql->db->select('job',undef,{
-        job_js => 1
+        job_js => $jsHid2Id->{new}
     },sub ($db,$error,$result) {
         if ($error){
             return $mainpro->reject($error);
@@ -169,11 +172,12 @@ sub sizeNewJobs ($self) {
             my $pro = Mojo::Promise->new;
 
             my $where = { 
-                job_id => $job->{job_id}
+                job_id => $job->{job_id},
             };
 
             $sql->db->update('job',{
-                job_js => 2
+                job_js => $jsHid2Id->{sizing},
+                job_ts_updated => time,
             },$where,sub ($db,$error,$result) {
                 if ($error){
                     return $pro->reject($error);
@@ -187,21 +191,23 @@ sub sizeNewJobs ($self) {
                 my $subpro = Mojo::Promise->new;
                 $sql->db->update('job',{
                     job_size => $data->{size},
-                    job_js => 3
+                    job_js => $jsHid2Id->{sized},
                 },$where,sub ($db,$error,$result) {
                     if ($error){
                         return $subpro->reject($error);
                     }
                     return $subpro->resolve({
                         job_id => $job->{job_id},
-                        job_size => $data->{size}
+                        job_size => $data->{size},
+                        job_ts_updated => time,
                     });
                 });
                 return $subpro;
             })->catch( sub ($err) {
                 my $subpro = Mojo::Promise->new;
                 $sql->db->update('job',{
-                    job_js => 1
+                    job_js => $jsHid2Id->{new},
+                    job_ts_updated => time,
                 },$where,sub ($db,$error,$result) {
                     if ($error){
                         return $subpro->reject($error);
@@ -215,32 +221,38 @@ sub sizeNewJobs ($self) {
     });
 }
 
+=head3 transferData ($self)
+
+Query the database for approved jobs. 
+
+=cut
+
 sub transferData ($self) {
     my $mainpro = Mojo::Promise->new;
+    my $jsHid2Id = $self->app->jsHid2Id;
     my $sql = $self->app->database->sql;
-
     $sql->db->select('job',undef,{
-        job_js => 4
+        job_js => $jsHid2Id->{approved}
     },sub ($db,$error,$result) {
         if ($error){
             return $mainpro->reject($error);
         }
         return $mainpro->resolve($result->hashes);
     });
+
     return $mainpro->then(sub ($hashes) {
         my @jobs;
-
         for my $job (@{$hashes->to_array}) {
-
             my $plugin = $self->cfg->{CONNECTION}{$job->{job_server}}{plugin};
             my $pro = Mojo::Promise->new;
-            my $sum = 0;
+
             my $where = { 
                 job_id => $job->{job_id}
             };
 
             $sql->db->update('job',{
-                job_js => 5
+                job_js => $jsHid2Id->{archiving},
+                job_ts_updated => time,
             },$where,sub ($db,$error,$result) {
                 if ($error){
                     return $pro->reject($error);
@@ -249,34 +261,42 @@ sub transferData ($self) {
             });
             
             push @jobs, $pro->then(sub {
+                return $plugin->streamFolder($job->{job_src})
+            })->then( sub ($data) {
                 my $subpro = Mojo::Promise->new;
-                open my $fh, "> :raw", $job->{job_dst}."/job_".$job->{job_id}.".tar" 
+                $self->log->debug("archiving job $job->{job_id}: $job->{job_src} -> $job->{job_dst}");
+                open my $fh, "|- :raw", "zstd", "-", "-T","4","-f","-q","-o",
+                    $job->{job_dst}."/job_".$job->{job_id}.".tar.zst" 
                     or die "opening job tar: $!";
                 my $em = $plugin->streamFolder($job->{job_src});
-                $em->on(error => sub ($em,@msgs) {
-                    $subpro->reject(@msgs);
+                $em->on(error => sub ($em,$msg,@args) {
+                    unlink $job->{job_dst}."/job_".$job->{job_id}.".tar.zst";
+                    $subpro->reject("transfering job $job->{job_id}: $msg");
                 });
-                $em->on(read => sub ($em,@data) {
-                    $sum += length($data[0]);
-                    print $fh $data[0] or return $subpro->reject($!);
+                $em->on(read => sub ($em,$buff,@data) {
+                    print $fh $buff;
                 });
                 $em->on(complete => sub ($em,@data) {
+                    close($fh);
+                    return $subpro->reject("closing job $job->{job_id}: $!") 
+                        if $!;
                     my $db = $sql->db;
                     my $tx = $db->begin;
                     $sql->db->update('job',{
-                        job_js => 6
+                        job_js => $jsHid2Id->{archived},
+                        job_ts_updated => time,
+
                     },$where,sub ($db,$error,$result) {
                         if ($error){
-                            return $subpro->reject($error);
+                            return $subpro->reject("db update error job $job->{job_id}: $error");
                         }
-                        my $note = "Transfer $job->{job_server} complete $sum Bytes";
+                        my $note = "Transfer $job->{job_server} complete";
                         $self->recordHistory({
                             db => $db,
                             job => $job->{job_id},
-                            js => 6,
+                            js => $jsHid2Id->{archived},
                             note => $note
                         })->then(sub {
-                            close($fh) or return $subpro->reject($!);
                             $tx->commit;
                             return $subpro->resolve($note);
                         },sub ($error) {
@@ -288,7 +308,8 @@ sub transferData ($self) {
             })->catch( sub ($err) {
                 my $subpro = Mojo::Promise->new;
                 $sql->db->update('job',{
-                    job_js => 4
+                    job_js => $jsHid2Id->{approved},
+                    job_ts_updated => time,
                 },$where,sub ($db,$error,$result) {
                     if ($error){
                         return $subpro->reject($error);
@@ -319,7 +340,7 @@ sub recordHistory ($self,$args) {
         history_note => $args->{note}
     },sub ($db,$error,$result) {
         if ($error){
-            return $pro->reject($error);
+            return $pro->reject("error: ".$error);
         }
         return $pro->resolve("decision recorded");
     });

@@ -1,3 +1,19 @@
+0.6.0 2019-09-10 17:57:07 +0200 Tobias Oetiker <tobi@oetiker.ch>
+
+ - use zstd to compress the archive file
+ - add extra job states
+ - refer to job states by name throughout the codebase
+ - restore job states to sane states after restart
+
+0.5.1 2019-07-02 13:14:11 +0200 Tobias Oetiker <tobi@oetiker.ch>
+
+ - add missing tls config options
+
+0.5.0 2019-06-19 10:51:37 +0200 Tobias Oetiker <tobi@oetiker.ch>
+
+ - tls support
+ - ad based admin group
+
 0.4.1 2019-04-25 16:54:48 +0200 Tobias Oetiker <tobi@oetiker.ch>
 
  - fix installer

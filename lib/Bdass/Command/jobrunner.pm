@@ -39,10 +39,10 @@ sub sizeJobs ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
         push @allJobs, $jp->then(sub ($job) {
-            $self->app->log->debug("Job $job->{job_id} -> $job->{job_size}");
+            $self->log->debug("Job $job->{job_id} -> $job->{job_size}");
             return undef;
         })->catch(sub ($err) {
-            $self->app->log->error("sub ".$err);
+            $self->log->error("size-sub-error ".$err);
             return undef;
         });
     }
@@ -53,10 +53,10 @@ sub transferJobs ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
         push @allJobs, $jp->then(sub ($result) {
-            $self->app->log->debug($result);
+            $self->log->debug($result);
             return undef;
         })->catch(sub ($err) {
-            $self->app->log->error("sub ".$err);
+            $self->log->error("transfer-sub ".$err);
             return undef;
         });
     }

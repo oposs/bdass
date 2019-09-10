@@ -3,9 +3,8 @@ use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable',-signatures;
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
 use Mojo::JSON qw(true false);
-use Bdass::ConnectionPlugin::base;
-use Bdass::Model::DataSource;
 use POSIX qw(strftime);
+
 
 =head1 NAME
 
@@ -63,7 +62,7 @@ has tableCfg => sub ($self) {
             label => trm('Status'),
             type => 'string',
             width => '2*',
-            key => 'js_name',
+            key => 'js_hid',
             sortable => true,
         },
         {
@@ -154,8 +153,6 @@ has actionCfg => sub ($self) {
                     job_id => $form->{selection}{job_id},
                     job_cbuser => $self->user->userId
                 },sub ($db,$error,$result) {
-                    use Data::Dumper;
-                    warn Dumper $result->rows,$form;
                     if ($error){
                         return $subpro->reject($error);
                     }
@@ -230,7 +227,7 @@ sub getTableData ($self,$args,@opts) {
             => ['js' => 'js_id','job_js'] 
             => ['cbuser' => 'cbuser_id', 'job_cbuser'],
         ],
-        ['job.*','js_name','cbuser_login'],$userFilter,\%SORT
+        ['job.*','js_hid','cbuser_login'],$userFilter,\%SORT
     )->hashes->each(sub ($el,$id) {
         $el->{job_ts_created} = $el->{job_ts_created}*1000;
     })->to_array;
