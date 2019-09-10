@@ -4,7 +4,6 @@ use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
 use POSIX qw(strftime);
 use Mojo::JSON qw(true false);
-use Bdass::ConnectionPlugin::base;
 use String::Random;
 
 =head1 NAME
@@ -37,10 +36,11 @@ Returns a Configuration Structure for the Job Entry Form.
 has formCfg => sub {
     my $self = shift;
     my $db = $self->user->db;
+    my $jsHid2Id = $self->app->jsHid2Id;
     my $con = {
         0 => 'Pick Action',
-        4 => 'Archiving Granted',
-        8 => 'Archiving Denied',
+        $jsHid2Id->{approved} => 'Archiving Approved',
+        $jsHid2Id->{denied} => 'Archiving Denied',
     };
     my $servers = [ map {
         { key => "$_",
@@ -105,7 +105,7 @@ has formCfg => sub {
                 structure => $servers,
             },
             validator => sub ($value,$field,$form) {
-                if ($value != 4 and $value != 8) {
+                if (not exists $con->{$value}) {
                     return trm("Pick a valid decision")
                 }
                 return undef;
@@ -118,6 +118,15 @@ has formCfg => sub {
                 required => true,
             },
             label => trm('Destination Folder'),
+            validator => sub ($value,$field,$form) {
+                if (not $value =~ m{^/}) {
+                    return trm("Destination folder must start with /");
+                }
+                if (not -d $value) {
+                    return trm("Destination folder does not exist");
+                }
+                return undef;
+            }
         },
         {
             key => 'job_decision',

@@ -48,13 +48,22 @@ has database => sub ($self,@args) {
     $database->sql->abstract(
         SQL::Abstract::Pg->new(
             name_sep => '.', 
-            quote_char => '"'
+            quote_char => '"',
     ));
     $database->sql->migrations
         ->name('BdassBaseDB')
         ->from_data(__PACKAGE__,'appdb.sql')
         ->migrate;
+
     return $database;
+};
+
+has jsHid2Id => sub ($app) {
+    my $js = {};
+    $app->database->mojoSqlDb->select('js')->hashes->each(sub ($e, $num) {
+        $js->{$e->{js_hid}} = $e->{js_id};
+    });
+    return $js;
 };
 
 has dataSource => sub ($app) {
@@ -65,8 +74,26 @@ has userObject => sub {
     Bdass::Model::User->new;
 };
 
+sub _cleanJobDb ($app) {
+    my $db = $app->database->mojoSqlDb;
+    my $jsHid2Id = $app->jsHid2Id;
+    my %map = (
+        sizing => 'new',
+        archiving => 'approved',
+        verifying => 'archived'
+    );
+    for my $js (keys %map){
+        $db->update('job',{
+            job_js => $jsHid2Id->{$map{$js}}
+        },{
+            job_js => $jsHid2Id->{$js}
+        });
+    }
+}
+
 sub startup ($app) {
     my $cfg = $app->config->cfgHash;
+    $app->_cleanJobDb;
     my %TLS;
     if (my $tls = $cfg->{BACKEND}{ad_tls}){
         %TLS = ( start_tls => $tls );
@@ -98,11 +125,11 @@ __DATA__
 -- 1 up
 
 INSERT INTO cbright (cbright_key,cbright_label)
-    VALUES ('write','Writer');
+    VALUES ('approver','Approver');
 
 CREATE TABLE IF NOT EXISTS js (
     js_id INTEGER PRIMARY KEY,
-    js_name TEXT
+    js_hid TEXT UNIQUE
 );
 
 INSERT INTO js
@@ -110,11 +137,13 @@ INSERT INTO js
     (1,'new'),
     (2,'sizing'),
     (3,'sized'),
-    (4,'authorized'),
+    (4,'approved'),
     (5,'archiving'),
-    (6,'complete'),
-    (7,'error'),
-    (8,'denied');
+    (6,'archived'),
+    (7,'verifying'),
+    (8,'verified'),
+    (9,'error'),
+    (10,'denied');
     
 CREATE TABLE IF NOT EXISTS job (
     job_id  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,7 +168,5 @@ CREATE TABLE IF NOT EXISTS history (
     history_js INTEGER NOT NULL REFERENCES js(js_id),
     history_note TEXT
 );
-
--- 2 up
 
 ALTER TABLE cbuser ADD cbuser_groups TEXT default '{}';

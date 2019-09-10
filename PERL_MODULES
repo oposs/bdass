@@ -1,5 +1,5 @@
 Mojolicious~8
-CallBackery@0.16.0
+CallBackery@0.18.1
 Mojo::SQLite
 Mojo::IOLoop::ReadWriteFork
 Mojolicious::Plugin::SPNEGO@0.4.0
@@ -8,3 +8,4 @@ PPI
 JSON::Validator
 SQL::Abstract::Pg
 String::Random
+Const::Exporter
