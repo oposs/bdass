@@ -8,4 +8,3 @@ PPI
 JSON::Validator
 SQL::Abstract::Pg
 String::Random
-Const::Exporter
