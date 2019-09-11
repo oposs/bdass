@@ -73,6 +73,8 @@ sub addArchiveJob ($self,$args) {
             my $pro = Mojo::Promise->new;
             $db->insert('job',{
                 job_cbuser => $args->{user}->userId,
+                job_group => $args->{group},
+                job_private => $args->{private},
                 job_token => $args->{token},
                 job_server => $args->{server},
                 job_note => $args->{note},

@@ -59,9 +59,16 @@ has tableCfg => sub ($self) {
             : ()
         ),
         {
-            label => trm('Status'),
+            label => trm('Group'),
             type => 'string',
             width => '2*',
+            key => 'job_group',
+            sortable => true,
+        },
+        {
+            label => trm('Status'),
+            type => 'string',
+            width => '1*',
             key => 'js_hid',
             sortable => true,
         },
@@ -74,7 +81,7 @@ has tableCfg => sub ($self) {
                 postfix => 'Byte',
                 locale => 'en'
             },
-            width => '2*',
+            width => '1*',
             key => 'job_size',
             sortable => true,
         },
@@ -137,8 +144,8 @@ has actionCfg => sub ($self) {
             set => {
                 minWidth => 500,
                 maxWidth => 500,
-                minHeight => 500,
-                maxHeight => 500,
+                minHeight => 600,
+                maxHeight => 600,
             }
         },
         {

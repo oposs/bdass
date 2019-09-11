@@ -47,6 +47,13 @@ has formCfg => sub {
           title => $con->{$_}{plugin}->name,
         }
     } keys %$con ];
+    my $grHash = $self->user->userInfo->{groups};
+    my $groups = [ map {
+        { 
+            key => $_,
+            title => $_
+        } 
+    } keys %$grHash ];
     return [
         {
             widget => 'header',
@@ -83,6 +90,11 @@ has formCfg => sub {
                 required => true,
                 structure => $servers,
             },
+            validator => sub {
+                my $key = shift;
+                return "invalid server" unless exists $con->{$key};
+                return "";
+            }
         },
         {
             key => 'path',
@@ -95,6 +107,37 @@ has formCfg => sub {
             },
 
         },
+        {
+            widget => 'header',
+            label => trm('Archive Ownership')
+        },        
+        {
+            key => 'group',
+            widget => 'selectBox',
+            label => trm('Group'),
+            cfg => {
+                required => true,
+                structure => $groups
+            },
+            validator => sub {
+                my $group = shift;
+                return "invalid group" if not exists $grHash->{$group};
+                return "";
+            }
+
+        },
+        {
+            key => 'private',
+            widget => 'checkBox',
+            label => trm('Private Archive'),
+            cfg => {
+                required => true,
+            },
+        },
+        {
+            widget => 'header',
+            label => trm('Extra Info')
+        }, 
         {
             key => 'note',
             widget => 'textArea',
@@ -117,6 +160,8 @@ has actionCfg => sub ($self) {
             return $self->app->dataSource->addArchiveJob({
                 user => $self->user,
                 token => $1,
+                group => $form->{group},
+                private => $form->{private},
                 server => $form->{server},
                 path => $form->{path},
                 note => $form->{note},

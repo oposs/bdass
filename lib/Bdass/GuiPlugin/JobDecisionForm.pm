@@ -69,6 +69,22 @@ has formCfg => sub {
             },
         },
         {
+            key => 'cbuser_login',
+            widget => 'text',
+            label => trm('User'),
+            set => {
+                readOnly => true,
+            },
+        },
+        {
+            key => 'job_group',
+            widget => 'text',
+            label => trm('Group'),
+            set => {
+                readOnly => true,
+            },
+        },
+        {
             key => 'job_src',
             widget => 'text',
             label => trm('Path'),
@@ -182,10 +198,15 @@ sub db ($self) {
 
 sub getAllFieldValues ($self,@args) {
     my $id = $args[0]->{selection}{job_id};
+    my $jsHid2Id = $self->app->jsHid2Id;
     my $data = $self->db->select(
-        'job',
-        [qw(job_id job_server job_src job_dst job_size job_note job_js job_decision)],{job_id => $id, job_js => [3,4,8] })->hash;
-    die mkerror(39483,"Only sized,denied and ready for archiving jobs can be decided") if not $data;
+        ['job'
+            => ['cbuser' => 'cbuser_id', 'job_cbuser'],
+        ],
+        [qw(job_id job_server job_group job_src job_dst job_size job_note job_js job_decision cbuser_login)],
+        {job_id => $id, job_js => [$jsHid2Id->{sized},$jsHid2Id->{denied},$jsHid2Id->{approved}] })->hash;
+    die mkerror(39483,"Only sized, denied and approved jobs can be decided upon")
+        if not $data;
     # hash key in frontend must be a string
     $data->{job_js} = "".$data->{job_js};
     return $data;

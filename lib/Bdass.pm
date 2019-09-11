@@ -150,6 +150,8 @@ CREATE TABLE IF NOT EXISTS job (
     job_js INTEGER REFERENCES js(js_id) DEFAULT 1,
     job_token TEXT NOT NULL UNIQUE,
     job_cbuser INTEGER NOT NULL REFERENCES cbuser(cbuser_id),
+    job_private BOOLEAN,
+    job_group TEXT NOT NULL,
     job_server TEXT NOT NULL,
     job_size INTEGER,
     job_src TEXT NOT NULL,
