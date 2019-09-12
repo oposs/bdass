@@ -1,5 +1,5 @@
 {
-  "extends": "qx",
+  "extends": "@qooxdoo/eslint-config-qx/browser",
   "parser": "babel-eslint",
   "globals": {
     "callbackery": false,

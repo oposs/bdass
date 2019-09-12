@@ -58,3 +58,4 @@ frontend/cache
 frontend/source/script
 .vscode
 .vstags
+node_modules

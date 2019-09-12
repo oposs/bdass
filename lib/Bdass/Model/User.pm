@@ -10,6 +10,8 @@ use Mojo::Base 'CallBackery::User';
 use CallBackery::Exception qw(mkerror);
 use Mojo::Util qw(b64_encode sha1_sum dumper);
 use Mojo::JSON qw(encode_json decode_json);
+use User::grent;
+use User::getgrouplist;
 
 has userId => sub {
     my $self = shift;
@@ -66,9 +68,12 @@ has userInfo => sub  {
                 my $c = shift;
                 my $user = shift;
                 my $ldap = shift; # bound Net::LDAP::SPNEGO connection
-                my $groups = $ldap->get_ad_groups($user->{samaccountname});
+                my @groups = map {
+                    getgrgid($_)->name;
+                } getgrouplist($user->{samaccountname});
                 # $self->log->debug(dumper $groups);
-                $userId = $self->provisionOrUpdateUser($user,$groups);
+                $userId = $self->provisionOrUpdateUser(
+                    $user,\@groups);
                 return 1; # 1 is you are happy with the outcome
             }
         }) or return undef;
@@ -81,7 +86,7 @@ has userInfo => sub  {
     my $info = $self->db->fetchRow('cbuser',{id=>$self->userId});
     $info->{sessionCookie} = $self->makeSessionCookie();
     $info->{groups} = { map {
-        $_ => 1 } keys %{decode_json($info->{cbuser_groups})}
+        $_ => 1 } @{decode_json($info->{cbuser_groups})}
     };
     delete $info->{cbuser_groups};
     return $info;
