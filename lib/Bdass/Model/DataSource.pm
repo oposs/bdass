@@ -325,6 +325,16 @@ sub transferData ($self) {
     });
 }
 
+=head3 catalogArchives ($self)
+
+Go through all the archives in 'archived' state, read them back and update the database in the process.
+
+=cut
+
+sub catalogArchives ($self) {
+    
+}
+
 =head3 recordHistory ($self,$job,$user,$js,$desc)
 
 Update history log
