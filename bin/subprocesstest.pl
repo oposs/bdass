@@ -14,7 +14,7 @@ my $rdr = IO::Handle->new;
 my $err = IO::Handle->new;
 
 my $pid = open3($wtr, $rdr, $err, 
-    'dd','if=/dev/zero','bs=10M','count=1000');
+    'perl','-e','print "x" x 200000;print STDERR "y"; kill -9, $$');
 
 sub hook ($fh,$name) {
     my $st = Mojo::IOLoop::Stream->new($fh);

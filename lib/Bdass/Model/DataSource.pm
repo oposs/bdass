@@ -4,6 +4,9 @@ use Mojo::Base -base,-signatures;
 use Time::HiRes qw(gettimeofday);
 use Mojo::Util qw(dumper);
 use Mojo::File;
+use Mojo::IOLoop::Stream;
+use IPC::Open3;
+
 
 =head1 NAME
 
@@ -19,12 +22,22 @@ Bdass::Model::DataSource - Data Source Management
 =cut
 
 has 'app';
-has log => sub { shift->app->log };
-has cfg => sub {
-    shift->app->config->cfgHash;
+
+has log => sub ($self) { 
+    $self->app->log 
 };
 
-has jsHid2Id => sub { shift->app->jsHid2Id };
+has cfg => sub ($self) {
+    $self->app->config->cfgHash;
+};
+
+has sql => sub ($self) { 
+    $self->app->database->sql
+};
+
+has jsHid2Id => sub ($self) { 
+    $self->app->jsHid2Id 
+};
 
 =head3 checkPath($key,$path,$token)
 
@@ -81,11 +94,11 @@ sub addArchiveJob ($self,$args) {
                 job_src => $data->{path},
             },sub ($db,$error,$result) {
                 if ($error){
+                    $tx = undef;
                     return $pro->reject($error);
                 }
                 if ($result and $result->last_insert_id){
-                    return $self->recordHistory({
-                        db => $db,
+                    return $self->recordHistory($db,{
                         job => $result->last_insert_id,
                         cbuser => $args->{user}->userId,
                         js => 1,
@@ -94,9 +107,11 @@ sub addArchiveJob ($self,$args) {
                         $tx->commit;
                         return $pro->resolve("job recorded");
                     },sub ($error) {
+                        $tx = undef;
                         return $pro->reject($error);
                     });
                 };
+                $tx = undef;
                 return $pro->reject("Failed to insert Job");
             });
             return $pro;
@@ -111,41 +126,41 @@ Record decision on archive job
 =cut
 
 sub recordDecision ($self,$args) {
-    my $pro = Mojo::Promise->new;
-
-    if (!$args->{user}->may('admin')){
-        return $pro->reject("No Permission to grant/reject Jobs");
-    }
-    my $db = $args->{user}->mojoSqlDb;
-    my $tx = $db->begin;
-    $db->update('job',
-    {
-        job_js => $args->{js},
-        job_decision => $args->{decision},
-        job_ts_updated => time,
-        job_dst => $args->{dst}
-    },
-    {
-        job_id => $args->{job},
-        job_js => [@{$self->jsHid2Id}{qw(sized approved denied)}], # sized
-    },sub ($db,$error,$result) {
-        if ($error){
-            return $pro->reject("Updating job $args->{id}: $error");
+    return Mojo::Promise->new( sub ($resolve,$reject) {
+        if (!$args->{user}->may('admin')){
+            return $reject->("No Permission to grant/reject Jobs");
         }
-        $self->recordHistory({
-            db => $db,
-            job => $args->{job},
-            cbuser => $args->{user}->userId,
-            js => $args->{js},
-            note => $args->{dst} . " - " .$args->{decision}
-        })->then(sub {
-            $tx->commit;
-            return $pro->resolve("new entry recorded");
-        },sub ($error) {
-            return $pro->reject("recording history: $error");
+        my $db = $self->sql->db;
+        my $tx = $db->begin;
+        $db->update('job',
+        {
+            job_js => $args->{js},
+            job_decision => $args->{decision},
+            job_ts_updated => time,
+            job_dst => $args->{dst}
+        },
+        {
+            job_id => $args->{job},
+            job_js => [@{$self->jsHid2Id}{qw(sized approved denied)}], # sized
+        },sub ($db,$error,$result) {
+            if ($error){
+                $tx = undef;
+                return $reject->("Updating job $args->{id}: $error");
+            }
+            $self->recordHistory($db,{
+                job => $args->{job},
+                cbuser => $args->{user}->userId,
+                js => $args->{js},
+                note => $args->{dst} . " - " .$args->{decision}
+            })->then(sub ($ret) {
+                $tx->commit;
+                return $resolve->("new entry recorded");
+            })->catch(sub ($error) {
+                $tx = undef;
+                return $reject->("recording history: $error");
+            });
         });
     });
-    return $pro;
 }
 
 =head3 sizeNewJobs ($self)
@@ -232,7 +247,7 @@ Query the database for approved jobs.
 sub transferData ($self) {
     my $mainpro = Mojo::Promise->new;
     my $jsHid2Id = $self->app->jsHid2Id;
-    my $sql = $self->app->database->sql;
+    my $sql = $self->sql;
     $sql->db->select('job',undef,{
         job_js => $jsHid2Id->{approved}
     },sub ($db,$error,$result) {
@@ -267,13 +282,15 @@ sub transferData ($self) {
             })->then( sub ($data) {
                 my $subpro = Mojo::Promise->new;
                 $self->log->debug("archiving job $job->{job_id}: $job->{job_src} -> $job->{job_dst}");
+
                 open my $fh, "|- :raw", "zstd", "-", "-T","4","-f","-q","-o",
                     $job->{job_dst}."/job_".$job->{job_id}.".tar.zst" 
                     or die "opening job tar: $!";
+
                 my $em = $plugin->streamFolder($job->{job_src});
                 $em->on(error => sub ($em,$msg,@args) {
                     unlink $job->{job_dst}."/job_".$job->{job_id}.".tar.zst";
-                    $subpro->reject("transfering job $job->{job_id}: $msg");
+                    $subpro->reject("transferring job $job->{job_id}: $msg");
                 });
                 $em->on(read => sub ($em,$buff,@data) {
                     print $fh $buff;
@@ -282,43 +299,117 @@ sub transferData ($self) {
                     close($fh);
                     return $subpro->reject("closing job $job->{job_id}: $!") 
                         if $!;
-                    my $db = $sql->db;
-                    my $tx = $db->begin;
-                    $sql->db->update('job',{
-                        job_js => $jsHid2Id->{archived},
-                        job_ts_updated => time,
-
-                    },$where,sub ($db,$error,$result) {
-                        if ($error){
-                            return $subpro->reject("db update error job $job->{job_id}: $error");
-                        }
-                        my $note = "Transfer $job->{job_server} complete";
-                        $self->recordHistory({
-                            db => $db,
-                            job => $job->{job_id},
-                            js => $jsHid2Id->{archived},
-                            note => $note
-                        })->then(sub {
-                            $tx->commit;
-                            return $subpro->resolve($note);
-                        },sub ($error) {
-                            return $subpro->reject("recording history: $error");
-                        });
+                    $self->updateJobStatus($job,'archived')->then(sub {
+                        return $subpro->resolve("transfer of job $job->{job_id} is complete");
+                    },sub ($error) {
+                        return $subpro->reject("recording history: $error");
                     });
                 });
                 return $subpro;
             })->catch( sub ($err) {
-                my $subpro = Mojo::Promise->new;
-                $sql->db->update('job',{
-                    job_js => $jsHid2Id->{approved},
-                    job_ts_updated => time,
-                },$where,sub ($db,$error,$result) {
-                    if ($error){
-                        return $subpro->reject($error);
+               return $self->updateJobStatus($job,'approved');
+            });
+        }
+        return \@jobs;
+    });
+}
+
+=head3 catalogArchives ($self)
+
+Go through all the archives in 'archived' state, read them back and update the database in the process.
+
+=cut
+
+sub catalogArchives ($self) {
+    return Mojo::Promise->new( sub ($resolve,$reject) {
+        my $jsHid2Id = $self->app->jsHid2Id;
+        my $sql = $self->app->database->sql;
+
+        $sql->db->select('job',undef,{
+            job_js => $jsHid2Id->{archived}
+        },sub ($db,$error,$result) {
+            if ($error){
+                return $reject->($error);
+            }
+            $resolve->($result->hashes);
+        });
+    })->then(sub ($hashes) {
+        my @jobs;
+        for my $job (@{$hashes->to_array}) {
+            push @jobs, Mojo::Promise->new(sub ($resolve,$reject) {
+                my $archive = $job->{job_dst}."/job_".$job->{job_id}.'.tar.zst';
+                $self->log->debug("cataloging job $archive");
+                my $rfh = IO::Handle->new;
+                my $efh = IO::Handle->new;
+
+                my $pid = eval { 
+                    open3(undef, $rfh, $efh, 
+                        'tar',
+                        '--use-compress-program=zstd',
+                        '--list',
+                        '--verbose',
+                        '--quoting-style=escape',
+                        '--file='.$archive
+                    );
+                };
+                if ($@){
+                    $reject->($@);
+                }
+                $self->log->debug("started tar");
+                my $rst = Mojo::IOLoop::Stream->new($rfh);
+                $rst->timeout(0);
+                my $est = Mojo::IOLoop::Stream->new($efh);
+                $est->timeout(0);
+
+                $rst->on(close => sub ($st) {
+                    $rst->stop;
+                    $est->stop;
+                    close($efh);
+                    waitpid($pid,0);
+                    my $ret = $?;
+                    if ($ret == 0) {                        
+                        $resolve->(1);
                     }
-                    return $subpro->reject($err);
+                    $reject->("cataloging $archive ended with exit code ($ret)");
                 });
-                return $subpro;
+
+                $rst->on(error => sub ($st,$err) {
+                    $rst->stop;
+                    $est->stop;
+                    close($rfh);
+                    close($efh);
+                    waitpid($pid,0);
+                    my $ret = $?;
+                    $reject->("error which parsing $archive: $err. ($ret)");
+                });
+
+                my $buffer = '';
+                $rst->on(read => sub ($stream,$bytes) {
+                    $buffer .= $bytes;
+                    my @lines = split /[\n\r]+/, $buffer;
+                    $buffer = pop @lines;
+                    $self->parseAndStoreCatalog($job,\@lines);
+                });
+                
+                $est->on(close => sub ($st) {
+                    $est->stop;
+                });
+
+                $est->on(error => sub ($st,$err) {
+                    $est->stop;
+                    $reject->("error on STDERR while working on $archive: $err.");
+                });
+
+                $est->on(read => sub ($stream,$bytes) {
+                    $self->log->error("cataloging $archive: $bytes");   
+                });
+                $est->start;
+                $rst->start;
+            })->then(sub ($ret) {
+                return $self->updateJobStatus($job,'verified');
+            })->catch(sub ($err) {
+                $self->log->error($err);
+                $self->revertJobCatalog($job);
             });
         }
         return \@jobs;
@@ -331,10 +422,10 @@ Update history log
 
 =cut
 
-sub recordHistory ($self,$args) {
+sub recordHistory ($self,$db,$args) {
     $self->log->debug("start record");
     my $pro = Mojo::Promise->new;
-    $args->{db}->insert('history',{
+    $db->insert('history',{
         history_job => $args->{job},
         history_cbuser => $args->{cbuser},
         history_ts => time,
@@ -342,11 +433,86 @@ sub recordHistory ($self,$args) {
         history_note => $args->{note}
     },sub ($db,$error,$result) {
         if ($error){
+            $self->log->error("recordDecision: $error");
             return $pro->reject("error: ".$error);
         }
+        $self->log->debug("recorded");
         return $pro->resolve("decision recorded");
     });
     return $pro;
+}
+
+=head3 updateJobStatus ($self,$job,$status)
+
+update job status returns promise
+
+=cut
+
+sub updateJobStatus ($self,$job,$status) {
+    my $jsHid2Id = $self->app->jsHid2Id;
+    my $pro = Mojo::Promise->new;
+    $self->sql->db->update('job',{
+        job_js => $jsHid2Id->{$status}
+    }, {
+        job_id => $job->{job_id}
+    },sub ($db,$error,$result) {
+        if ($error){
+            return $pro->reject("error: ".$error);
+        }
+        return $pro->resolve("status updated");
+    });
+    return $pro;
+}
+
+=head3 revertJobCatalog ($self,$job)
+
+update job status, returns promise.
+
+=cut
+
+sub revertJobCatalog ($self,$job) {
+    $self->updateJobStatus($job,'archived')->then(sub {
+        my $pro = Mojo::Promise->new;
+        $self->sql->db->delete('file',{
+            file_job => $job->{job_id}
+        },sub ($db,$error,$result) {
+            if ($error){
+                return $pro->reject("error: ".$error);
+            }
+            return $pro->resolve("catalog reverted for $job->{job_id}");
+        });
+        return $pro;
+    });
+}
+
+=head3 parseAndStoreCatalog($job,$linesArray)
+
+update catalog database. runs sync
+
+=cut
+
+sub parseAndStoreCatalog ($self,$job,$linesArray) {
+    my $db = $self->sql->db;
+    my $tx = $db->begin;
+    for my $line (@$linesArray) {
+        my %data;
+        @data{qw(
+            file_perm
+            file_owner
+            file_size
+            file_date
+            file_time
+            file_name)
+        } = split /\s+/, $line;
+        next if (delete $data{file_perm}) =~ /^d/;
+        $data{file_job} = $job->{job_id};
+        $data{file_date} = $data{file_date}
+            .' '
+            .(delete $data{file_time});
+        $self->log->debug($self->app->dumper(\%data));
+        $db->insert('file',\%data);
+    }
+    $tx->commit;
 }
 
 1;

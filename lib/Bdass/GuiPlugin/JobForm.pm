@@ -33,7 +33,7 @@ Returns a Configuration Structure for the Job Entry Form.
 
 =cut
 
-my $tokenPattern = '[a-zA-Z][-_a-zA-Z0-9]{18}[A-Za-z0-9]';
+my $tokenPattern = '[a-zA-Z][_a-zA-Z0-9]{18}[A-Za-z0-9]';
 my $tokenPrefix = Bdass::ConnectionPlugin::base->new->tokenFilePrefix;
 my $tokenPostfix = '.txt';
 

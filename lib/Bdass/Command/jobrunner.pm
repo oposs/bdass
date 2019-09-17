@@ -63,6 +63,20 @@ sub transferJobs ($self,$jobs) {
     return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
 };
 
+sub catalogingJobs ($self,$jobs) {
+    my @allJobs;
+    for my $jp (@$jobs){
+        push @allJobs, $jp->then(sub ($result) {
+            $self->log->debug($result);
+            return undef;
+        })->catch(sub ($err) {
+            $self->log->error("catalog-sub ".$err);
+            return undef;
+        });
+    }
+    return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
+};
+
 sub run {
     my $self   = shift;
     local @ARGV = @_ if @_;
@@ -72,6 +86,8 @@ sub run {
     Mojo::Promise->all(
         $data->sizeNewJobs->then(sub ($jobs) { $self->sizeJobs($jobs)} ),
         $data->transferData->then(sub ($jobs) { $self->transferJobs($jobs) }),
+        $data->catalogArchives->then(sub ($jobs) { 
+            $self->catalogingJobs($jobs) }),
     )->then(sub {
         $self->app->log->info("DONE");
     })->catch(sub ($error) {
