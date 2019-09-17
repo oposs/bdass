@@ -81,7 +81,7 @@ has userInfo => sub  {
     # prevent recursion by already setting the userId
     $self->userId($userId);
     # we are in 
-    $self->log->debug("Hello $userId");
+    #$self->log->debug("Hello $userId");
 
     my $info = $self->db->fetchRow('cbuser',{id=>$self->userId});
     $info->{sessionCookie} = $self->makeSessionCookie();

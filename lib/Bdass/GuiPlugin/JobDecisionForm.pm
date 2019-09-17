@@ -163,7 +163,7 @@ has actionCfg => sub ($self) {
             dst => $form->{job_dst},
             js => $form->{job_js},
             decision=> $form->{job_decision}
-        })->then(sub ($data) {
+        })->then( sub ($data) {
             return {
                 action => 'dataSaved',
                 message => trm("Job Archiving Decision recorded."),

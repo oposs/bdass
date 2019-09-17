@@ -184,8 +184,8 @@ has actionCfg => sub ($self) {
                 set => {
                     minWidth => 500,
                     maxWidth => 500,
-                    minHeight => 600,
-                    maxHeight => 600,
+                    minHeight => 700,
+                    maxHeight => 700,
                 }
             },
         ) : () ),
