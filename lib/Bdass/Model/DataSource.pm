@@ -406,6 +406,7 @@ sub catalogArchives ($self) {
                 $est->start;
                 $rst->start;
             })->then(sub ($ret) {
+                $self->chown($job);
                 return $self->updateJobStatus($job,'verified');
             })->catch(sub ($err) {
                 $self->log->error($err);
@@ -414,6 +415,16 @@ sub catalogArchives ($self) {
         }
         return \@jobs;
     });
+}
+
+=head3 jobToArchive ($self,$job)
+
+returns the archive path
+
+=cut
+
+sub jobToArchive($self,$job) {
+    return $job->{job_dst}."/job_".$job->{job_id}.'.tar.zst';
 }
 
 =head3 recordHistory ($self,$job,$user,$js,$desc)
