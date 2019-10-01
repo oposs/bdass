@@ -23,20 +23,20 @@ Bdass::Model::DataSource - Data Source Management
 
 has 'app';
 
-has log => sub ($self) { 
-    $self->app->log 
+has log => sub ($self) {
+    $self->app->log
 };
 
 has cfg => sub ($self) {
     $self->app->config->cfgHash;
 };
 
-has sql => sub ($self) { 
+has sql => sub ($self) {
     $self->app->database->sql
 };
 
-has jsHid2Id => sub ($self) { 
-    $self->app->jsHid2Id 
+has jsHid2Id => sub ($self) {
+    $self->app->jsHid2Id
 };
 
 =head3 checkPath($key,$path,$token)
@@ -165,7 +165,7 @@ sub recordDecision ($self,$args) {
 
 =head3 sizeNewJobs ($self)
 
-Query the database for jobs not yet sized. 
+Query the database for jobs not yet sized.
 
 =cut
 
@@ -188,7 +188,7 @@ sub sizeNewJobs ($self) {
             my $plugin = $self->cfg->{CONNECTION}{$job->{job_server}}{plugin};
             my $pro = Mojo::Promise->new;
 
-            my $where = { 
+            my $where = {
                 job_id => $job->{job_id},
             };
 
@@ -201,7 +201,7 @@ sub sizeNewJobs ($self) {
                 }
                 return $pro->resolve($result);
             });
-            
+
             push @jobs, $pro->then(sub {
                 return $plugin->sizeFolder($job->{job_src})
             })->then( sub ($data) {
@@ -240,7 +240,7 @@ sub sizeNewJobs ($self) {
 
 =head3 transferData ($self)
 
-Query the database for approved jobs. 
+Query the database for approved jobs.
 
 =cut
 
@@ -263,7 +263,7 @@ sub transferData ($self) {
             my $plugin = $self->cfg->{CONNECTION}{$job->{job_server}}{plugin};
             my $pro = Mojo::Promise->new;
 
-            my $where = { 
+            my $where = {
                 job_id => $job->{job_id}
             };
 
@@ -276,20 +276,20 @@ sub transferData ($self) {
                 }
                 return $pro->resolve($result);
             });
-            
+
             push @jobs, $pro->then(sub {
                 return $plugin->streamFolder($job->{job_src})
             })->then( sub ($data) {
                 my $subpro = Mojo::Promise->new;
                 $self->log->debug("archiving job $job->{job_id}: $job->{job_src} -> $job->{job_dst}");
-
+                my $archive = $self->_jobToArchive($job);
                 open my $fh, "|- :raw", "zstd", "-", "-T","4","-f","-q","-o",
-                    $job->{job_dst}."/job_".$job->{job_id}.".tar.zst" 
+                    $archive
                     or die "opening job tar: $!";
 
                 my $em = $plugin->streamFolder($job->{job_src});
                 $em->on(error => sub ($em,$msg,@args) {
-                    unlink $job->{job_dst}."/job_".$job->{job_id}.".tar.zst";
+                    unlink $archive;
                     $subpro->reject("transferring job $job->{job_id}: $msg");
                 });
                 $em->on(read => sub ($em,$buff,@data) {
@@ -297,7 +297,7 @@ sub transferData ($self) {
                 });
                 $em->on(complete => sub ($em,@data) {
                     close($fh);
-                    return $subpro->reject("closing job $job->{job_id}: $!") 
+                    return $subpro->reject("closing job $job->{job_id}: $!")
                         if $!;
                     $self->updateJobStatus($job,'archived')->then(sub {
                         return $subpro->resolve("transfer of job $job->{job_id} is complete");
@@ -337,13 +337,13 @@ sub catalogArchives ($self) {
         my @jobs;
         for my $job (@{$hashes->to_array}) {
             push @jobs, Mojo::Promise->new(sub ($resolve,$reject) {
-                my $archive = $job->{job_dst}."/job_".$job->{job_id}.'.tar.zst';
+                my $archive = $self->_jobToArchive($job);
                 $self->log->debug("cataloging job $archive");
                 my $rfh = IO::Handle->new;
                 my $efh = IO::Handle->new;
 
-                my $pid = eval { 
-                    open3(undef, $rfh, $efh, 
+                my $pid = eval {
+                    open3(undef, $rfh, $efh,
                         'tar',
                         '--use-compress-program=zstd',
                         '--list',
@@ -367,7 +367,7 @@ sub catalogArchives ($self) {
                     close($efh);
                     waitpid($pid,0);
                     my $ret = $?;
-                    if ($ret == 0) {                        
+                    if ($ret == 0) {
                         $resolve->(1);
                     }
                     $reject->("cataloging $archive ended with exit code ($ret)");
@@ -390,7 +390,7 @@ sub catalogArchives ($self) {
                     $buffer = pop @lines;
                     $self->parseAndStoreCatalog($job,\@lines);
                 });
-                
+
                 $est->on(close => sub ($st) {
                     $est->stop;
                 });
@@ -401,12 +401,12 @@ sub catalogArchives ($self) {
                 });
 
                 $est->on(read => sub ($stream,$bytes) {
-                    $self->log->error("cataloging $archive: $bytes");   
+                    $self->log->error("cataloging $archive: $bytes");
                 });
                 $est->start;
                 $rst->start;
             })->then(sub ($ret) {
-                $self->chown($job);
+                $self->_jobChown($job);
                 return $self->updateJobStatus($job,'verified');
             })->catch(sub ($err) {
                 $self->log->error($err);
@@ -417,14 +417,31 @@ sub catalogArchives ($self) {
     });
 }
 
-=head3 jobToArchive ($self,$job)
+=head3 _jobToArchive ($self,$job)
 
 returns the archive path
 
 =cut
 
-sub jobToArchive($self,$job) {
+sub _jobToArchive ($self,$job) {
     return $job->{job_dst}."/job_".$job->{job_id}.'.tar.zst';
+}
+
+=head3 _jobChown ($self,$job)
+
+chown job accordning to job settings.
+
+=cut
+
+sub _jobChown ($self,$job) {
+
+    my $user = $self->app->database->sql->db->select('cbuser','cbuser_login',{
+        cbuser_id => $job->{job_cbuser}
+    })->result->hash->{cbuser_login};
+    my $group = $job->{job_group};
+    my $uid = getpwnam($user);
+    my $gid = getgrnam($group);
+    chown $uid,$gid,$self->_jobToArchive($job);
 }
 
 =head3 recordHistory ($self,$job,$user,$js,$desc)
