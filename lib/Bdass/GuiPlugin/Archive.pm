@@ -1,4 +1,4 @@
-package Bdass::GuiPlugin::Job;
+package Bdass::GuiPlugin::Archive;
 use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable',-signatures;
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
@@ -8,11 +8,11 @@ use POSIX qw(strftime);
 
 =head1 NAME
 
-Bdass::GuiPlugin::Job - Job Table
+Bdass::GuiPlugin::Archive - Archive Table
 
 =head1 SYNOPSIS
 
- use Bdass::GuiPlugin::Job;
+ use Bdass::GuiPlugin::Archive;
 
 =head1 DESCRIPTION
 
@@ -66,13 +66,6 @@ has tableCfg => sub ($self) {
             sortable => true,
         },
         {
-            label => trm('Status'),
-            type => 'string',
-            width => '1*',
-            key => 'js_hid',
-            sortable => true,
-        },
-        {
             label => trm('Size'),
             type => 'num',
             format => {
@@ -114,11 +107,11 @@ has tableCfg => sub ($self) {
             sortable => true,
         },
         {
-            label => trm('Created'),
+            label => trm('Verified'),
             type => 'date',
             format => 'yyyy-MM-dd HH:mm:ss Z',
             width => '3*',
-            key => 'job_ts_created',
+            key => 'job_ts_updated',
             sortable => true,
         }
      ]
@@ -132,63 +125,6 @@ Only users who can write get any actions presented.
 
 has actionCfg => sub ($self) {
     return [
-        {
-            label => trm('Create Job'),
-            action => 'popup',
-            addToContextMenu => false,
-            name => 'createJob',
-            popupTitle => trm('Create Archive Job'),
-            backend => {
-                plugin => 'JobForm'
-            },
-            set => {
-                minWidth => 500,
-                maxWidth => 500,
-                minHeight => 600,
-                maxHeight => 600,
-            }
-        },
-        {
-            label => trm('Remove Job'),
-            action => 'submitVerify',
-            question => trm('Do you really want to remove the selected Job?'),
-            addToContextMenu => true,
-            key => 'removeJob',
-            actionHandler => sub ($self,$form) {
-                my $subpro = Mojo::Promise->new;
-                $self->user->mojoSqlDb->delete('job',{
-                    job_id => $form->{selection}{job_id},
-                    job_cbuser => $self->user->userId
-                },sub ($db,$error,$result) {
-                    if ($error){
-                        return $subpro->reject($error);
-                    }
-                    return $subpro->resolve({
-                        action => 'reload'
-                    });
-                });
-                return $subpro;
-            }
-        },
-        ( (not $self->user or $self->user->may('admin') )
-        ? (
-            {
-                label => trm('Decide Job'),
-                action => 'popup',
-                addToContextMenu => false,
-                name => 'decideJob',
-                popupTitle => trm('Decide Job'),
-                backend => {
-                    plugin => 'JobDecisionForm'
-                },
-                set => {
-                    minWidth => 500,
-                    maxWidth => 500,
-                    minHeight => 700,
-                    maxHeight => 700,
-                }
-            },
-        ) : () ),
         {
             label => trm('Reload'),
             action => 'submit',
@@ -208,11 +144,8 @@ sub db ($self) {
 }
 
 sub getTableRowCount ($self,$args,@opts) {
-    my $userFilter = my $userFilter = $self->user->may('admin') ? {
-        js_hid => { '!=' => 'verified' }
-    } : {
-        job_cbuser => $self->user->userId,
-        js_hid => { '!=' => 'verified' }
+    my $userFilter = $self->user->may('admin') ? undef : {
+        job_cbuser => $self->user->userId
     };
     return ($self->db->select('job',[\'count(job_id) AS count'],$userFilter)->hash->{count});
 }
@@ -220,10 +153,10 @@ sub getTableRowCount ($self,$args,@opts) {
 sub getTableData ($self,$args,@opts) {
     my %SORT;
     my $userFilter = $self->user->may('admin') ? {
-        js_hid => { '!=' => 'verified' }
+        js_hid => 'verified' }
     } : {
         job_cbuser => $self->user->userId,
-        js_hid => { '!=' => 'verified' }
+        js_hid => 'verified' }
     };
     if ($args->{sortColumn}){
         $SORT{order_by} = {
@@ -252,7 +185,7 @@ __END__
 
 =head1 COPYRIGHT
 
-Copyright (c) 2018 by OETIKER+PARTNER AG. All rights reserved.
+Copyright (c) 2019 by OETIKER+PARTNER AG. All rights reserved.
 
 =head1 AUTHOR
 
@@ -260,6 +193,6 @@ S<Tobias Oetiker E<lt>tobi@oetiker.chE<gt>>
 
 =head1 HISTORY
 
- 2018-04-12 oetiker 0.0 first version
+ 2019-10-03 oetiker 0.0 first version
 
 =cut

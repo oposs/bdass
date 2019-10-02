@@ -49,10 +49,10 @@ has formCfg => sub {
     } keys %$con ];
     my $grHash = $self->user->userInfo->{groups};
     my $groups = [ map {
-        { 
+        {
             key => $_,
             title => $_
-        } 
+        }
     } keys %$grHash ];
     return [
         {
@@ -75,10 +75,10 @@ has formCfg => sub {
                     . $tokenPostfix,
             },
             validator => sub ($value,$field,$form) {
-                if ($value 
+                if ($value
                     !~ m{^\Q${tokenPrefix}\E${tokenPattern}\Q${tokenPostfix}\E$}){
                     return "Invalid Token";
-                }      
+                }
                 return undef;
             }
         },
@@ -110,7 +110,7 @@ has formCfg => sub {
         {
             widget => 'header',
             label => trm('Archive Ownership')
-        },        
+        },
         {
             key => 'group',
             widget => 'selectBox',
@@ -137,7 +137,7 @@ has formCfg => sub {
         {
             widget => 'header',
             label => trm('Extra Info')
-        }, 
+        },
         {
             key => 'note',
             widget => 'textArea',
@@ -155,7 +155,7 @@ has formCfg => sub {
 has actionCfg => sub ($self) {
     my $handler = sub ($self,$form) {
         $form->{path} =~ s{/*$}{/};
-        if ( $form->{token} 
+        if ( $form->{token}
             =~ /^\Q${tokenPrefix}\E(${tokenPattern})\Q${tokenPostfix}\E$/ ) {
             return $self->app->dataSource->addArchiveJob({
                 user => $self->user,
@@ -191,6 +191,10 @@ has actionCfg => sub ($self) {
 
 
 __END__
+
+=head1 COPYRIGHT
+
+Copyright (c) 2018 by OETIKER+PARTNER AG. All rights reserved.
 
 =head1 AUTHOR
 
