@@ -28,7 +28,15 @@ All the methods of L<CallBackery::GuiPlugin::AbstractTable> plus:
 =cut
 
 has formCfg => sub ($self) {
-    return [];
+    return [
+         {
+            key => 'query',
+            widget => 'text',
+            set => {
+                placeholder => trm('Search ...')
+            },
+        },
+    ];
 };
 
 =head2 tableCfg
@@ -126,16 +134,16 @@ Only users who can write get any actions presented.
 has actionCfg => sub ($self) {
     return [
         {
-            label => trm('Reload'),
+            label => trm('Search'),
             action => 'submit',
             addToContextMenu => false,
-            key => 'reload',
+            key => 'search',
             actionHandler => sub {
                 return {
                     action => 'reload'
                 }
             }
-        }
+        },
     ];
 };
 
@@ -143,21 +151,31 @@ sub db ($self) {
     $self->user->mojoSqlDb;
 }
 
-sub getTableRowCount ($self,$args,@opts) {
-    my $userFilter = $self->user->may('admin') ? undef : {
-        job_cbuser => $self->user->userId
+sub userFilter ($self,$query) {
+    my $userFilter = {
+        js_hid => 'verified'
     };
-    return ($self->db->select('job',[\'count(job_id) AS count'],$userFilter)->hash->{count});
+    if (not $self->user->may('admin')){
+        $userFilter->{job_cbuser}  = $self->user->userId;
+    };
+    if ($query) {
+        $userFilter->{-or} = {
+            job_note => { -like => '%'.$query.'%'},
+            job_src => { -like => '%'.$query.'%'},
+            job_server => { -like => '%'.$query.'%'},
+        }
+    }
+};
+
+sub getTableRowCount ($self,$args,@opts) {
+    my $query = $args->{formData}{query};
+    return ($self->db->select('job',[\'count(job_id) AS count'],$self->userFilter($query))->hash->{count});
 }
 
 sub getTableData ($self,$args,@opts) {
     my %SORT;
-    my $userFilter = $self->user->may('admin') ? {
-        js_hid => 'verified' }
-    } : {
-        job_cbuser => $self->user->userId,
-        js_hid => 'verified' }
-    };
+    my $query = $args->{formData}{query};
+
     if ($args->{sortColumn}){
         $SORT{order_by} = {
             ($args->{sortDesc} ? '-desc' : '-asc')
@@ -173,7 +191,7 @@ sub getTableData ($self,$args,@opts) {
             => ['js' => 'js_id','job_js']
             => ['cbuser' => 'cbuser_id', 'job_cbuser'],
         ],
-        ['job.*','js_hid','cbuser_login'],$userFilter,\%SORT
+        ['job.*','js_hid','cbuser_login'],$self->userFilter($query),\%SORT
     )->hashes->each(sub ($el,$id) {
         $el->{job_ts_created} = $el->{job_ts_created}*1000;
     })->to_array;

@@ -207,24 +207,21 @@ sub db ($self) {
     $self->user->mojoSqlDb;
 }
 
-sub getTableRowCount ($self,$args,@opts) {
-    my $userFilter = my $userFilter = $self->user->may('admin') ? {
-        js_hid => { '!=' => 'verified' }
-    } : {
-        job_cbuser => $self->user->userId,
+has userFilter => sub ($self) {
+    my $userFilter = {
         js_hid => { '!=' => 'verified' }
     };
-    return ($self->db->select('job',[\'count(job_id) AS count'],$userFilter)->hash->{count});
+    if (not $self->user->may('admin')){
+        $userFilter->{job_cbuser}  = $self->user->userId;
+    };
+};
+
+sub getTableRowCount ($self,$args,@opts) {
+    return ($self->db->select('job',[\'count(job_id) AS count'],$self->userFilter)->hash->{count});
 }
 
 sub getTableData ($self,$args,@opts) {
     my %SORT;
-    my $userFilter = $self->user->may('admin') ? {
-        js_hid => { '!=' => 'verified' }
-    } : {
-        job_cbuser => $self->user->userId,
-        js_hid => { '!=' => 'verified' }
-    };
     if ($args->{sortColumn}){
         $SORT{order_by} = {
             ($args->{sortDesc} ? '-desc' : '-asc')
@@ -240,7 +237,7 @@ sub getTableData ($self,$args,@opts) {
             => ['js' => 'js_id','job_js']
             => ['cbuser' => 'cbuser_id', 'job_cbuser'],
         ],
-        ['job.*','js_hid','cbuser_login'],$userFilter,\%SORT
+        ['job.*','js_hid','cbuser_login'],$self->userFilter,\%SORT
     )->hashes->each(sub ($el,$id) {
         $el->{job_ts_created} = $el->{job_ts_created}*1000;
     })->to_array;
