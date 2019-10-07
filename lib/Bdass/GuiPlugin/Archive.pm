@@ -170,7 +170,11 @@ sub userFilter ($self,$query) {
         js_hid => 'verified'
     };
     if (not $self->user->may('admin')){
-        $userFilter->{job_cbuser}  = $self->user->userId;
+        $userFilter->{-or} = [
+            job_cbuser  => $self->user->userId,
+            job_group   => [ keys %{$self->user->userInfo->{groups}}]
+        ]
+    }
     };
     if ($query) {
         my @query = split /\s+/, $query;
