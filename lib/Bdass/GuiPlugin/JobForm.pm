@@ -57,6 +57,32 @@ has formCfg => sub {
     return [
         {
             widget => 'header',
+            label => trm('Meta Information'),
+        },
+        {
+            key => 'name',
+            widget => 'text',
+            label => trm('Archive Name'),
+            set => {
+                width => 300,
+                required => true,
+                placeholder => trm('a descriptive name')
+            },
+
+        },
+        {
+            key => 'project',
+            widget => 'text',
+            label => trm('Project Name'),
+            set => {
+                width => 300,
+                required => true,
+                placeholder => trm('which project does this archive belong to?')
+            },
+
+        },
+        {
+            widget => 'header',
             label => trm('Archive Job Creation'),
             note => trm('In order to register a folder for archiving, you have to prove that you have write access to it. You do this by creating archive token file in the folder you want to get archived. Every job gets a unique archive token filename.'),
         },
@@ -96,6 +122,7 @@ has formCfg => sub {
                 return "";
             }
         },
+        
         {
             key => 'path',
             widget => 'text',
@@ -165,6 +192,8 @@ has actionCfg => sub ($self) {
                 server => $form->{server},
                 path => $form->{path},
                 note => $form->{note},
+                name => $form->{name},
+                project => $form->{project},
             })->then(sub ($data) {
                 return {
                     action => 'dataSaved',

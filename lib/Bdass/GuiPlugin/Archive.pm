@@ -159,11 +159,14 @@ sub userFilter ($self,$query) {
         $userFilter->{job_cbuser}  = $self->user->userId;
     };
     if ($query) {
-        $userFilter->{-or} = {
-            job_note => { -like => '%'.$query.'%'},
-            job_src => { -like => '%'.$query.'%'},
-            job_server => { -like => '%'.$query.'%'},
-        }
+        my @query = split /\s+/, $query;
+        $userFilter->{-and} = [
+            map {
+                'job_name || job_project'  => { 
+                    -like => '%'.$_.'%'
+                }, @query
+            },
+        ]
     }
 };
 
