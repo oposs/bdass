@@ -42,7 +42,11 @@ tab-name = Create Initial User
 
 *** PLUGIN: Job ***
 module = Job
-tab-name = Archive Jobs
+tab-name = Jobs
+
+*** PLUGIN: Archive ***
+module = Archive
+tab-name = Archives
 
 *** PLUGIN: AdminUser ***
 module = Users

@@ -218,6 +218,10 @@ sub getAllFieldValues ($self,@args) {
 
 __END__
 
+=head1 COPYRIGHT
+
+Copyright (c) 2018 by OETIKER+PARTNER AG. All rights reserved.
+
 =head1 AUTHOR
 
 S<Tobias Oetiker E<lt>tobi@oetiker.chE<gt>>

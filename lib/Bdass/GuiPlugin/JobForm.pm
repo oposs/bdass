@@ -49,12 +49,38 @@ has formCfg => sub {
     } keys %$con ];
     my $grHash = $self->user->userInfo->{groups};
     my $groups = [ map {
-        { 
+        {
             key => $_,
             title => $_
-        } 
+        }
     } keys %$grHash ];
     return [
+        {
+            widget => 'header',
+            label => trm('Meta Information'),
+        },
+        {
+            key => 'name',
+            widget => 'text',
+            label => trm('Archive Name'),
+            set => {
+                width => 300,
+                required => true,
+                placeholder => trm('a descriptive name')
+            },
+
+        },
+        {
+            key => 'project',
+            widget => 'text',
+            label => trm('Project Name'),
+            set => {
+                width => 300,
+                required => true,
+                placeholder => trm('which project does this archive belong to?')
+            },
+
+        },
         {
             widget => 'header',
             label => trm('Archive Job Creation'),
@@ -75,10 +101,10 @@ has formCfg => sub {
                     . $tokenPostfix,
             },
             validator => sub ($value,$field,$form) {
-                if ($value 
+                if ($value
                     !~ m{^\Q${tokenPrefix}\E${tokenPattern}\Q${tokenPostfix}\E$}){
                     return "Invalid Token";
-                }      
+                }
                 return undef;
             }
         },
@@ -96,6 +122,7 @@ has formCfg => sub {
                 return "";
             }
         },
+        
         {
             key => 'path',
             widget => 'text',
@@ -110,7 +137,7 @@ has formCfg => sub {
         {
             widget => 'header',
             label => trm('Archive Ownership')
-        },        
+        },
         {
             key => 'group',
             widget => 'selectBox',
@@ -137,7 +164,7 @@ has formCfg => sub {
         {
             widget => 'header',
             label => trm('Extra Info')
-        }, 
+        },
         {
             key => 'note',
             widget => 'textArea',
@@ -155,7 +182,7 @@ has formCfg => sub {
 has actionCfg => sub ($self) {
     my $handler = sub ($self,$form) {
         $form->{path} =~ s{/*$}{/};
-        if ( $form->{token} 
+        if ( $form->{token}
             =~ /^\Q${tokenPrefix}\E(${tokenPattern})\Q${tokenPostfix}\E$/ ) {
             return $self->app->dataSource->addArchiveJob({
                 user => $self->user,
@@ -165,6 +192,8 @@ has actionCfg => sub ($self) {
                 server => $form->{server},
                 path => $form->{path},
                 note => $form->{note},
+                name => $form->{name},
+                project => $form->{project},
             })->then(sub ($data) {
                 return {
                     action => 'dataSaved',
@@ -191,6 +220,10 @@ has actionCfg => sub ($self) {
 
 
 __END__
+
+=head1 COPYRIGHT
+
+Copyright (c) 2018 by OETIKER+PARTNER AG. All rights reserved.
 
 =head1 AUTHOR
 

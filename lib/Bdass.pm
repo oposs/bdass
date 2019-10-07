@@ -156,6 +156,8 @@ CREATE TABLE IF NOT EXISTS job (
     job_size INTEGER,
     job_src TEXT NOT NULL,
     job_dst TEXT,
+    job_name TEXT,
+    job_project TEXT,
     job_note TEXT,
     job_decision TEXT,
     job_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')),
@@ -172,10 +174,6 @@ CREATE TABLE IF NOT EXISTS history (
 );
 
 ALTER TABLE cbuser ADD cbuser_groups TEXT default '{}';
-
--- 2 up
-
--- 3 up
 
 CREATE VIRTUAL TABLE IF NOT EXISTS file USING fts4(
     file_job,
