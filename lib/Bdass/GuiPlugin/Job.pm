@@ -59,6 +59,20 @@ has tableCfg => sub ($self) {
             : ()
         ),
         {
+            label => trm('Name'),
+            type => 'string',
+            width => '2*',
+            key => 'job_name',
+            sortable => true,
+        },
+        {
+            label => trm('Project'),
+            type => 'string',
+            width => '2*',
+            key => 'job_project',
+            sortable => true,
+        },
+        {
             label => trm('Group'),
             type => 'string',
             width => '2*',
