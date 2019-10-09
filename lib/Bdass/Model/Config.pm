@@ -49,10 +49,13 @@ has grammar => sub {
     my $gr = $self->SUPER::grammar;
     push @{$gr->{_sections}},'CONNECTION';
     push @{$gr->{_mandatory}},'CONNECTION';
-    push @{$gr->{BACKEND}{_vars}},'ad_uri','admin_group';
-    push @{$gr->{BACKEND}{_mandatory}},'ad_uri','admin_group';
+    push @{$gr->{BACKEND}{_vars}},'ad_uri','admin_group','smtp_server','mail_from','admin_email';
+    push @{$gr->{BACKEND}{_mandatory}},'ad_uri','admin_group','smtp_server','m,ail_from','admin_email';
     $gr->{BACKEND}{ad_uri} = { _doc => 'AD URI - ldap://ad1.company.com'};
     $gr->{BACKEND}{admin_group} = { _doc => 'admin group from AD'};
+    $gr->{BACKEND}{mail_from} = { _doc => 'mail from'}; 
+    $gr->{BACKEND}{admin_email} = { _doc => 'admin email address'};
+    $gr->{BACKEND}{smtp_server} = { _doc => 'smtp server host'};
     push @{$gr->{BACKEND}{_sections}},'ad_tls';
     push @{$gr->{BACKEND}{ad_tls}{_vars}}, 
         qw(verify sslversion sslserver ciphers clientcert clientkey keydecrypt capath cafile checkcrl);

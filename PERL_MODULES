@@ -9,3 +9,5 @@ JSON::Validator
 SQL::Abstract::Pg
 String::Random
 User::getgrouplist
+Email::MIME
+Email::Sender

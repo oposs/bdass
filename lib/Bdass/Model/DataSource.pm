@@ -101,7 +101,7 @@ sub addArchiveJob ($self,$args) {
                     return $self->recordHistory($db,{
                         job => $result->last_insert_id,
                         cbuser => $args->{user}->userId,
-                        js => 1,
+                        js => $self->jsHid2Id->{new},
                         note => "Job created"
                     })->then(sub {
                         $tx->commit;
@@ -154,6 +154,20 @@ sub recordDecision ($self,$args) {
                 note => $args->{dst} . " - " .$args->{decision}
             })->then(sub ($ret) {
                 $tx->commit;
+                if ($args->{js} == $self->jsHid2Id->{approved}){
+                    $self->mail->sendMail(
+                        "job:".$args->{job},
+                        "Archive Request $args->{job} has been approved",
+                        "$args->{decision}\n\nYou will get a notification once archiving is complete."
+                    );
+                }
+                elsif ($args->{js} == $self->jsHid2Id->{denied}){
+                    $self->mail->sendMail(
+                        "job:".$args->{job},
+                        "Archive Request $args->{job} has been denied",
+                        "$args->{decision}"
+                    );
+                }
                 return $resolve->("new entry recorded");
             })->catch(sub ($error) {
                 $tx = undef;
@@ -172,7 +186,7 @@ Query the database for jobs not yet sized.
 sub sizeNewJobs ($self) {
     my $mainpro = Mojo::Promise->new;
     my $jsHid2Id = $self->app->jsHid2Id;
-    my $sql = $self->app->database->sql;
+    my $sql = $self->sql;
     $sql->db->select('job',undef,{
         job_js => $jsHid2Id->{new}
     },sub ($db,$error,$result) {
@@ -215,6 +229,7 @@ sub sizeNewJobs ($self) {
                     }
                     return $subpro->resolve({
                         job_id => $job->{job_id},
+                        job_name => $job->{job_name},
                         job_size => $data->{size},
                         job_ts_updated => time,
                     });
@@ -300,7 +315,7 @@ sub transferData ($self) {
                     return $subpro->reject("closing job $job->{job_id}: $!")
                         if $!;
                     $self->updateJobStatus($job,'archived')->then(sub {
-                        return $subpro->resolve("transfer of job $job->{job_id} is complete");
+                        return $subpro->resolve($job);
                     },sub ($error) {
                         return $subpro->reject("recording history: $error");
                     });
@@ -323,7 +338,7 @@ Go through all the archives in 'archived' state, read them back and update the d
 sub catalogArchives ($self) {
     return Mojo::Promise->new( sub ($resolve,$reject) {
         my $jsHid2Id = $self->app->jsHid2Id;
-        my $sql = $self->app->database->sql;
+        my $sql = $self->sql;
 
         $sql->db->select('job',undef,{
             job_js => $jsHid2Id->{archived}
@@ -407,7 +422,8 @@ sub catalogArchives ($self) {
                 $rst->start;
             })->then(sub ($ret) {
                 $self->_jobChown($job);
-                return $self->updateJobStatus($job,'verified');
+                $self->updateJobStatus($job,'verified');
+                return $job;
             })->catch(sub ($err) {
                 $self->log->error($err);
                 $self->revertJobCatalog($job);
@@ -435,7 +451,7 @@ chown job accordning to job settings.
 
 sub _jobChown ($self,$job) {
 
-    my $user = $self->app->database->sql->db->select('cbuser','cbuser_login',{
+    my $user = $self->sql->db->select('cbuser','cbuser_login',{
         cbuser_id => $job->{job_cbuser}
     })->result->hash->{cbuser_login};
     my $group = $job->{job_group};

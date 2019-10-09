@@ -33,13 +33,18 @@ my %opt;
 
 has log => sub { shift->app->log };
 
-has cfg => sub { shift->app->config->cfgHash->{CONNECTION} };
+has cfg => sub { shift->app->config->cfgHash };
+
+has mail => sub ($self) { 
+    Bdass::Model::Mail->new( app => $self->app );
+};
 
 sub sizeJobs ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
         push @allJobs, $jp->then(sub ($job) {
-            $self->log->debug("Job $job->{job_id} -> $job->{job_size}");
+            $self->log->debug("Job $job->{job_id} $job->{job_name} -> $job->{job_size}");
+            $self->mail->sendMail($self->cfg->{BACKEND}{admin_email},"Archive Job $job->{job_id} $job->{job_name} ready for Decision","see subject");
             return undef;
         })->catch(sub ($err) {
             $self->log->error("size-sub-error ".$err);
@@ -52,8 +57,8 @@ sub sizeJobs ($self,$jobs) {
 sub transferJobs ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
-        push @allJobs, $jp->then(sub ($result) {
-            $self->log->debug($result);
+        push @allJobs, $jp->then(sub ($job) {
+            $self->log->debug("Job $job->{job_id} $job->{job_name} archived";
             return undef;
         })->catch(sub ($err) {
             $self->log->error("transfer-sub ".$err);
@@ -66,8 +71,9 @@ sub transferJobs ($self,$jobs) {
 sub catalogingJobs ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
-        push @allJobs, $jp->then(sub ($result) {
-            $self->log->debug($result);
+        push @allJobs, $jp->then(sub ($job) {
+            $self->log->debug("Job $job->{job_id} $job->{job_name} verified";
+            $self->mail->sendMail("job:".$job->{job_id},"Archive Job $job->{job_id} $job->{job_name} has been archived and verified","see subject");
             return undef;
         })->catch(sub ($err) {
             $self->log->error("catalog-sub ".$err);
