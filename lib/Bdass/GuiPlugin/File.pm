@@ -8,11 +8,11 @@ use POSIX qw(strftime);
 
 =head1 NAME
 
-Bdass::GuiPlugin::Archive - Archive Table
+Bdass::GuiPlugin::File - File Table
 
 =head1 SYNOPSIS
 
- use Bdass::GuiPlugin::Archive;
+ use Bdass::GuiPlugin::File;
 
 =head1 DESCRIPTION
 
@@ -46,14 +46,6 @@ has formCfg => sub ($self) {
 
 has tableCfg => sub ($self) {
     return [
-        {
-            label => trm('Id'),
-            type => 'number',
-            width => '1*',
-            key => 'job_id',
-            sortable => true,
-            primary => true,
-        },
         (
             $self->user->may('admin')
             ?  {
@@ -67,25 +59,42 @@ has tableCfg => sub ($self) {
             : ()
         ),
         {
-            label => trm('Name'),
+            label => trm('Archive Id'),
+            type => 'string',
+            width => '2*',
+            key => 'file_job',
+            sortable => false,
+        },
+        {
+            label => trm('Archive Name'),
             type => 'string',
             width => '2*',
             key => 'job_name',
-            sortable => true,
+            sortable => false,
         },
         {
-            label => trm('Project'),
+            label => trm('Archive Owner'),
             type => 'string',
             width => '2*',
-            key => 'job_project',
-            sortable => true,
+            key => 'cbuser_login',
+            sortable => false,
         },
         {
-            label => trm('Group'),
+            label => trm('File Name'),
             type => 'string',
             width => '2*',
-            key => 'job_group',
-            sortable => true,
+            key => 'file_name',
+            sortable => false,
+        },
+        {
+            label => trm('File Date'),
+            type => 'string',
+            width => '1*',
+            key => 'file_date',
+            type => 'date',
+            format => 'yyyy-MM-dd HH:mm:ss Z',
+            width => '3*',
+            sortable => false,
         },
         {
             label => trm('Size'),
@@ -97,43 +106,7 @@ has tableCfg => sub ($self) {
                 locale => 'en'
             },
             width => '1*',
-            key => 'job_size',
-            sortable => true,
-        },
-        {
-            label => trm('Server'),
-            type => 'text',
-            width => '2*',
-            key => 'job_server',
-            sortable => true,
-        },
-        {
-            label => trm('Src'),
-            type => 'string',
-            width => '4*',
-            key => 'job_src',
-            sortable => true,
-        },
-        {
-            label => trm('Dst'),
-            type => 'string',
-            width => '4*',
-            key => 'job_dst',
-            sortable => true,
-        },
-        {
-            label => trm('Note'),
-            type => 'string',
-            width => '4*',
-            key => 'job_note',
-            sortable => true,
-        },
-        {
-            label => trm('Verified'),
-            type => 'date',
-            format => 'yyyy-MM-dd HH:mm:ss Z',
-            width => '3*',
-            key => 'job_ts_updated',
+            key => 'file_size',
             sortable => true,
         }
      ]
@@ -166,9 +139,7 @@ sub db ($self) {
 }
 
 sub userFilter ($self,$query) {
-    my $userFilter = {
-        js_hid => 'verified'
-    };
+    my $userFilter = {};
     if (not $self->user->may('admin')){
         $userFilter->{-or} = [
             job_cbuser  => $self->user->userId,
@@ -181,19 +152,15 @@ sub userFilter ($self,$query) {
     };
     if ($query) {
         my @query = split /\s+/, $query;
-        $userFilter->{-and} = [
-            map {
-                'job_name || job_project'  => { 
-                    -like => '%'.$_.'%'
-                }, @query
-            },
-        ]
+        $userFilter->{file} = { 
+            -match => $query
+        }
     }
 };
 
 sub getTableRowCount ($self,$args,@opts) {
     my $query = $args->{formData}{query};
-    return ($self->db->select('job',[\'count(job_id) AS count'],$self->userFilter($query))->hash->{count});
+    return ($self->db->select('file',[\'count(*) AS count'],$self->userFilter($query))->hash->{count});
 }
 
 sub getTableData ($self,$args,@opts) {
@@ -211,13 +178,13 @@ sub getTableData ($self,$args,@opts) {
     $SORT{offset} = $args->{firstRow};
 
     my $data = $self->db->select(
-        ['job'
-            => ['js' => 'js_id','job_js']
+        ['file'
+            => ['job' => 'job_id','file_job']
             => ['cbuser' => 'cbuser_id', 'job_cbuser'],
         ],
-        ['job.*','js_hid','cbuser_login'],$self->userFilter($query),\%SORT
+        ['file.*','job.*','cbuser_login'],$self->userFilter($query),\%SORT
     )->hashes->each(sub ($el,$id) {
-        $el->{job_ts_created} = $el->{job_ts_created}*1000;
+        $el->{file_size} = int($el->{file_size});
     })->to_array;
     return $data;
 }
