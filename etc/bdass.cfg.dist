@@ -6,6 +6,7 @@ sesame_user = adfadsfasdf4ee3r
 sesame_pass = 393afhkjhffjj
 ad_uri = ldap://my-ad-Server
 admin_group = Remote Desktop Users
+smtp_server = smtp.example.com
 +ad_tls
 verify = none
 # see https://metacpan.org/pod/Net::LDAP#start_tls-(-OPTIONS-) for more OPTIONS

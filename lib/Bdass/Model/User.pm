@@ -28,6 +28,7 @@ sub provisionOrUpdateUser {
     my $data = {
         login => $user->{samaccountname},
         given => $user->{givenname},
+        email => $user->{mail},
         family => $user->{sn},
         groups => encode_json($groups),
     };
@@ -40,7 +41,7 @@ sub provisionOrUpdateUser {
     }
 
     $self->db->updateOrInsertData('cbuser',{
-           map { $_ => $data->{$_} } qw(login family given groups note)
+           map { $_ => $data->{$_} } qw(login family given email groups note)
     },$data->{id} ? { id => int($data->{id}) } : ());
 }
 

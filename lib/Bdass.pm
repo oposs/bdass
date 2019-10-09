@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS history (
 );
 
 ALTER TABLE cbuser ADD cbuser_groups TEXT default '{}';
+ALTER TABLE cbuser ADD cbuser_email TEXT NOT NULL;
 
 CREATE VIRTUAL TABLE IF NOT EXISTS file USING fts4(
     file_job,
