@@ -186,3 +186,13 @@ CREATE VIRTUAL TABLE IF NOT EXISTS file USING fts4(
     notindexed=file_job
 );
 
+CREATE TABLE IF NOT EXISTS task (
+    task_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_cbuser INTEGER REFERENCES cbuser(cbuser_id),
+    task_instruction TEXT NOT NULL, -- JSON
+    task_status TEXT,
+    task_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')),
+    task_ts_started TIMESTAMP,
+    task_ts_done TIMESTAMP
+);
+

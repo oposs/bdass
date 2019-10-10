@@ -2,7 +2,7 @@ package Bdass::GuiPlugin::Archive;
 use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable',-signatures;
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
-use Mojo::JSON qw(true false);
+use Mojo::JSON qw(true false encode_json);
 use POSIX qw(strftime);
 
 
@@ -155,6 +155,33 @@ has actionCfg => sub ($self) {
             actionHandler => sub {
                 return {
                     action => 'reload'
+                }
+            }
+        },
+        {
+            label => trm('Restore'),
+            action => 'submit',
+            addToContextMenu => true,
+            key => 'restore',
+            actionHandler => sub ($self,$args) {
+                my $job = $self->db->select('job',undef,{
+                    job_id => $args->{formData}{job_id},
+                    $self->userFilter
+                })->result->hash 
+                or die mkerror(3948,"Permission denied");
+
+                $self->db->insert('task',{
+                    task_cbuser => $self->user->userId,
+                    task_instruction => encode_json({
+                        action => 'restore',
+                        job_id => $job->{job_id},
+                    }),
+                    tast_status => 'waiting for execution'
+                });
+                return {
+                    action => 'dataSaved',
+                    message => trm("Restore scheduled. Will send email once restore is complete."),
+                    title => trm("Restore Archive"),
                 }
             }
         },

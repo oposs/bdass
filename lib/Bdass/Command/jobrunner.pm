@@ -68,7 +68,7 @@ sub transferJobs ($self,$jobs) {
     return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
 };
 
-sub catalogingJobs ($self,$jobs) {
+sub catalogingArchives ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
         push @allJobs, $jp->then(sub ($job) {
@@ -82,6 +82,18 @@ sub catalogingJobs ($self,$jobs) {
     }
     return @allJobs ? Mojo::Promise->all(@allJobs) : undef;
 };
+sub restoreTaks ($self,$tasks) {
+    my @allTasks;
+    for my $ta (@$tasks){
+        push @allTasks, $ta->then(sub ($task) {
+            return undef;
+        })->catch(sub ($err) {
+            $self->log->error("restore-task-sub ".$err);
+            return undef;
+        });
+    }
+    return @allTasks ? Mojo::Promise->all(@allTasks) : undef;
+};
 
 sub run {
     my $self   = shift;
@@ -93,7 +105,11 @@ sub run {
         $data->sizeNewJobs->then(sub ($jobs) { $self->sizeJobs($jobs)} ),
         $data->transferData->then(sub ($jobs) { $self->transferJobs($jobs) }),
         $data->catalogArchives->then(sub ($jobs) { 
-            $self->catalogingJobs($jobs) }),
+            $self->catalogingArchives($jobs) 
+        }),
+        $data->restoreArchives->then(sub ($tasks) { 
+            $self->restoreTaks($tasks) 
+        }),
     )->then(sub {
         $self->app->log->info("DONE");
     })->catch(sub ($error) {

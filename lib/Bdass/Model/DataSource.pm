@@ -433,6 +433,127 @@ sub catalogArchives ($self) {
     });
 }
 
+=head3 restoreArchives ($self)
+
+Go through the task log and start restore tasks.
+
+=cut
+
+sub restoreArchives ($self) {
+    return Mojo::Promise->new( sub ($resolve,$reject) {
+        my $jsHid2Id = $self->app->jsHid2Id;
+        my $sql = $self->app->database->sql;
+
+        $sql->db->select('task',undef,{
+            task_ts_done => undef,
+        },sub ($db,$error,$result) {
+            if ($error){
+                return $reject->($error);
+            }
+            $resolve->($result->hashes);
+        });
+    })->then(sub ($hashes) {
+        my @tasks;
+        for my $task (@{$hashes->to_array}) {
+            my $action = decode_json($task->{task_instruction});
+            my $job = $sql->db->select(['job' => [
+                'cbuser', 'cbuser_id' => 'job_cbuser'
+            ]],undef,{
+                job_id => $action->{job_id}
+            })->result->hash;
+            push @tasks, Mojo::Promise->new(sub ($resolve,$reject) {
+                my $archive = $self->_jobToArchive($job);
+                $self->log->debug("restoring $archive");
+                
+                my $name = lc($job->{job_id}.'-'.$job-{cbuser_login}.'-'.$job->{job_name});
+                $name =~ s{[^-.=_a-z0-9]}{_};
+                my $restore_dir = $self->cfg->{BACKEND}{restore_dir}.'/'.$name;
+                if (-e $restore_dir){
+                    return $reject->("archive restore target $restore_dir exists already");
+                }
+                mkdir $restore_dir,($job->{job_private} ? 0500 : 0550 );
+                my $uid = getpwnam($job->{cbuser_login});
+                my $gid = getgrnam($job->{job_group});
+                chown $uid,$gid, $restore_dir;
+                $self->db->update('task',{
+                    task_ts_started => time,
+                    task_status => 'archive restoring'
+                },
+                {
+                    task_id => $task->{task_id}
+                });
+                Mojo::IOLoop->subprocess(sub ($subprocess) {
+                        chdir $restore_dir;
+                        system 'tar',
+                            '--use-compress-program=zstd',
+                            '--group='.$job->{job_group},
+                            '--owner='.$job->{cbuser_login},
+                            '--extract',
+                            '--file='.$archive;
+                        if ($? != 0) {
+                            system 'rm', '-rf', $restore_dir;
+                        }
+                        return $?;
+                    }, 
+                    sub ($subprocess, $err, $ret) {
+                        if ($err or $ret){
+                            $self->_taskFail($task);
+                            $reject->("archive restore failed");
+                        }
+                        $self->_taskSuccess($task,$restore_dir);
+                        $resolve->({task => $task,job=>$job});
+                    }
+               );
+            });
+        }    
+        return \@tasks;
+    });
+}
+
+=head3 _taskFail ($self,$task)
+
+record task failure
+
+=cut
+
+sub _taskFail ($self,$task) {
+    $self->db->update('task',{
+        task_ts_started => null,
+        task_ts_done => time,
+        task_status => 'archive restore failed'
+    },
+    {
+        task_id => $task->{task_id}
+    });
+    
+    $self->mail->sendMail(
+        "cbuser:".$task->{task_cbuser},
+        "Archive Restore request $task->{task_id} failed",
+        "see subject"
+    );   
+}
+
+=head3 _taskSuccess ($self,$task,$path)
+
+record task success
+
+=cut
+
+sub _taskSuccess ($self,$task,$path) {
+    $self->db->update('task',{
+        task_ts_done => time,
+        task_status => 'archive restore successful'
+    },
+    {
+        task_id => $task->{task_id}
+    });
+    $self->mail->sendMail(
+        "cbuser:".$task->{task_cbuser},
+        "Archive Restore request $task->{task_id} is complete",
+        "You can find your restored files in $path"
+    );   
+}
+
 =head3 _jobToArchive ($self,$job)
 
 returns the archive path
@@ -445,7 +566,7 @@ sub _jobToArchive ($self,$job) {
 
 =head3 _jobChown ($self,$job)
 
-chown job accordning to job settings.
+chown job according to job settings.
 
 =cut
 
