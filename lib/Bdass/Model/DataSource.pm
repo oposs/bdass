@@ -455,11 +455,12 @@ sub restoreArchives ($self) {
     })->then(sub ($hashes) {
         my @tasks;
         for my $task (@{$hashes->to_array}) {
-            my $action = decode_json($task->{task_instruction});
+            my $arguments = decode_json($task->{task_arguments});
+            next unless $task->{task_call} eq 'restore';
             my $job = $sql->db->select(['job' => [
                 'cbuser', 'cbuser_id' => 'job_cbuser'
             ]],undef,{
-                job_id => $action->{job_id}
+                job_id => $arguments->{job_id}
             })->result->hash;
             push @tasks, Mojo::Promise->new(sub ($resolve,$reject) {
                 my $archive = $self->_jobToArchive($job);

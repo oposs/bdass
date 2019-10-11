@@ -172,8 +172,8 @@ has actionCfg => sub ($self) {
 
                 $self->db->insert('task',{
                     task_cbuser => $self->user->userId,
-                    task_instruction => encode_json({
-                        action => 'restore',
+                    task_call => 'restore',
+                    task_arguments => encode_json({
                         job_id => $job->{job_id},
                     }),
                     tast_status => 'waiting for execution'
