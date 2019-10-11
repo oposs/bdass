@@ -35,8 +35,12 @@ has log => sub { shift->app->log };
 
 has cfg => sub { shift->app->config->cfgHash };
 
+has dataSource => sub ($self) { 
+    Bdass::Model::DataSource->new( app => $self->app );
+};
+
 has mail => sub ($self) { 
-    Bdass::Model::Mail->new( app => $self->app );
+    $self->dataSource->mail;
 };
 
 sub sizeJobs ($self,$jobs) {
@@ -58,7 +62,7 @@ sub transferJobs ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
         push @allJobs, $jp->then(sub ($job) {
-            $self->log->debug("Job $job->{job_id} $job->{job_name} archived";
+            $self->log->debug("Job $job->{job_id} $job->{job_name} archived");
             return undef;
         })->catch(sub ($err) {
             $self->log->error("transfer-sub ".$err);
@@ -72,7 +76,7 @@ sub catalogingArchives ($self,$jobs) {
     my @allJobs;
     for my $jp (@$jobs){
         push @allJobs, $jp->then(sub ($job) {
-            $self->log->debug("Job $job->{job_id} $job->{job_name} verified";
+            $self->log->debug("Job $job->{job_id} $job->{job_name} verified");
             $self->mail->sendMail("job:".$job->{job_id},"Archive Job $job->{job_id} $job->{job_name} has been archived and verified","see subject");
             return undef;
         })->catch(sub ($err) {

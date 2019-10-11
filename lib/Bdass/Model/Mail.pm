@@ -27,9 +27,9 @@ has mailTransport => sub {
     });
 };
 
-has mailFrom => sub {
+has mailFrom => sub ($self) {
     $self->cfg->{BACKEND}{mail_from};
-}
+};
 
 has sql => sub ($self) {
     $self->app->database->sql
@@ -45,8 +45,13 @@ sub sendMail ($self,$to,$subject,$message) {
     if ($to =~ /^job:(\d+)/){
         $self->sql->db->select(['cbuser' =>
             [ job => 'job_cbuser', 'cbuser_id']
-        ],'cbuser_mail',{
-            job_id => $1;
+        ],'cbuser_email',{
+            job_id => $1
+        });
+    }
+    elsif ($to =~ /^cbuser:(\d+)/){
+        $self->sql->db->select('cbuser','cbuser_mail',{
+            cbuser_id => $1
         });
     }
     eval {
@@ -71,3 +76,5 @@ sub sendMail ($self,$to,$subject,$message) {
         $self->log->error("Sending mail to $to: $@");
     }
 }
+
+1;

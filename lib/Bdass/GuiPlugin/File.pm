@@ -1,4 +1,4 @@
-package Bdass::GuiPlugin::Archive;
+package Bdass::GuiPlugin::File;
 use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable',-signatures;
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
@@ -144,12 +144,12 @@ sub userFilter ($self,$query) {
         $userFilter->{-or} = [
             job_cbuser  => $self->user->userId,
             -and => [
-                -not_bool => 'job_private'
+                -not_bool => 'job_private',
                 job_group   => [ keys %{$self->user->userInfo->{groups}}]
             ]
         ]
     }
-    };
+ 
     if ($query) {
         my @query = split /\s+/, $query;
         $userFilter->{file} = { 

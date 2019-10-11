@@ -5,6 +5,7 @@ use Time::HiRes qw(gettimeofday);
 use Mojo::Util qw(dumper);
 use Mojo::File;
 use Mojo::IOLoop::Stream;
+use Bdass::Model::Mail;
 use IPC::Open3;
 
 
@@ -37,6 +38,10 @@ has sql => sub ($self) {
 
 has jsHid2Id => sub ($self) {
     $self->app->jsHid2Id
+};
+
+has mail => sub ($self) { 
+    Bdass::Model::Mail->new( app => $self->app );
 };
 
 =head3 checkPath($key,$path,$token)
@@ -457,7 +462,7 @@ sub restoreArchives ($self) {
         for my $task (@{$hashes->to_array}) {
             my $arguments = decode_json($task->{task_arguments});
             next unless $task->{task_call} eq 'restore';
-            my $job = $sql->db->select(['job' => [
+            my $job = $self->sql->db->select(['job' => [
                 'cbuser', 'cbuser_id' => 'job_cbuser'
             ]],undef,{
                 job_id => $arguments->{job_id}
@@ -466,7 +471,7 @@ sub restoreArchives ($self) {
                 my $archive = $self->_jobToArchive($job);
                 $self->log->debug("restoring $archive");
                 
-                my $name = lc($job->{job_id}.'-'.$job-{cbuser_login}.'-'.$job->{job_name});
+                my $name = lc($job->{job_id}.'-'.$job->{cbuser_login}.'-'.$job->{job_name});
                 $name =~ s{[^-.=_a-z0-9]}{_};
                 my $restore_dir = $self->cfg->{BACKEND}{restore_dir}.'/'.$name;
                 if (-e $restore_dir){
@@ -519,7 +524,7 @@ record task failure
 
 sub _taskFail ($self,$task) {
     $self->db->update('task',{
-        task_ts_started => null,
+        task_ts_started => undef,
         task_ts_done => time,
         task_status => 'archive restore failed'
     },

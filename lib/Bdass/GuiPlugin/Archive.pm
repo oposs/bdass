@@ -176,7 +176,7 @@ has actionCfg => sub ($self) {
                     task_arguments => encode_json({
                         job_id => $job->{job_id},
                     }),
-                    tast_status => 'waiting for execution'
+                    task_status => 'waiting for execution'
                 });
                 return {
                     action => 'dataSaved',
@@ -200,12 +200,12 @@ sub userFilter ($self,$query) {
         $userFilter->{-or} = [
             job_cbuser  => $self->user->userId,
             -and => [
-                -not_bool => 'job_private'
+                -not_bool => 'job_private',
                 job_group   => [ keys %{$self->user->userInfo->{groups}}]
             ]
         ]
     }
-    };
+
     if ($query) {
         my @query = split /\s+/, $query;
         $userFilter->{-and} = [

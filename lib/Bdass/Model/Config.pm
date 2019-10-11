@@ -35,7 +35,8 @@ has connectionPluginList => sub {
             my @pDirs = split /::/, $pPath;
             my $fPath = File::Spec->catdir($path, @pDirs, '*.pm');
             for my $file (glob($fPath)) {
-                my ($volume, $modulePath, $moduleName) = File::Spec->splitpath($file);
+                my ($volume, $modulePath, $moduleName) 
+                    = File::Spec->splitpath($file);
                 $moduleName =~ s{\.pm$}{};
                 $pluginList->{$moduleName} = 'Connection Plugin Module';
             }
@@ -50,7 +51,7 @@ has grammar => sub {
     push @{$gr->{_sections}},'CONNECTION';
     push @{$gr->{_mandatory}},'CONNECTION';
     push @{$gr->{BACKEND}{_vars}},'ad_uri','admin_group','smtp_server','mail_from','admin_email';
-    push @{$gr->{BACKEND}{_mandatory}},'ad_uri','admin_group','smtp_server','m,ail_from','admin_email';
+    push @{$gr->{BACKEND}{_mandatory}},'ad_uri','admin_group','smtp_server','mail_from','admin_email';
     $gr->{BACKEND}{ad_uri} = { _doc => 'AD URI - ldap://ad1.company.com'};
     $gr->{BACKEND}{admin_group} = { _doc => 'admin group from AD'};
     $gr->{BACKEND}{mail_from} = { _doc => 'mail from'}; 
