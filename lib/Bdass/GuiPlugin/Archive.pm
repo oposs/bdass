@@ -54,18 +54,14 @@ has tableCfg => sub ($self) {
             sortable => true,
             primary => true,
         },
-        (
-            $self->user->may('admin')
-            ?  {
+        {
                 label => trm('User'),
                 type => 'text',
                 width => '2*',
                 key => 'cbuser_login',
                 sortable => true,
                 primary => true,
-            }
-            : ()
-        ),
+        },
         {
             label => trm('Name'),
             type => 'string',
@@ -164,10 +160,13 @@ has actionCfg => sub ($self) {
             addToContextMenu => true,
             key => 'restore',
             actionHandler => sub ($self,$args) {
-                my $job = $self->db->select('job',undef,{
-                    job_id => $args->{formData}{job_id},
-                    $self->userFilter
-                })->result->hash 
+                my $job = $self->db->select(['job'
+                    => ['js' => 'js_id','job_js']
+                    => ['cbuser' => 'cbuser_id', 'job_cbuser'],
+                ],undef,{
+                    %{$self->userFilter(undef)},
+                    job_id => $args->{selection}{job_id},
+                })->hash 
                 or die mkerror(3948,"Permission denied");
 
                 $self->db->insert('task',{
@@ -216,11 +215,15 @@ sub userFilter ($self,$query) {
             },
         ]
     }
+    return $userFilter;
 };
 
 sub getTableRowCount ($self,$args,@opts) {
     my $query = $args->{formData}{query};
-    return ($self->db->select('job',[\'count(job_id) AS count'],$self->userFilter($query))->hash->{count});
+    return ($self->db->select(['job'
+            => ['js' => 'js_id','job_js']
+            => ['cbuser' => 'cbuser_id', 'job_cbuser'],
+        ],[\'count(job_id) AS count'],$self->userFilter($query))->hash->{count});
 }
 
 sub getTableData ($self,$args,@opts) {
@@ -245,6 +248,7 @@ sub getTableData ($self,$args,@opts) {
         ['job.*','js_hid','cbuser_login'],$self->userFilter($query),\%SORT
     )->hashes->each(sub ($el,$id) {
         $el->{job_ts_created} = $el->{job_ts_created}*1000;
+        $el->{job_ts_updated} = $el->{job_ts_updated}*1000;
     })->to_array;
     return $data;
 }

@@ -61,6 +61,23 @@ has formCfg => sub {
             },
         },
         {
+            key => 'job_name',
+            widget => 'text',
+            label => trm('Archive Name'),
+            set => {
+                readOnly => true,
+            },
+
+        },
+        {
+            key => 'job_project',
+            widget => 'text',
+            label => trm('Project Name'),
+            set => {
+                readOnly => true,
+            },
+        },
+        {
             key => 'job_server',
             widget => 'text',
             label => trm('Server'),
@@ -116,8 +133,10 @@ has formCfg => sub {
             key => 'job_js',
             widget => 'selectBox',
             label => 'Decision',
-            cfg => {
+            set => {
                 required => true,
+            },
+            cfg => {
                 structure => $servers,
             },
             validator => sub ($value,$field,$form) {
@@ -130,7 +149,7 @@ has formCfg => sub {
         {
             key => 'job_dst',
             widget => 'text',
-            cfg => {
+            set => {
                 required => true,
             },
             label => trm('Destination Folder'),
@@ -147,7 +166,7 @@ has formCfg => sub {
         {
             key => 'job_decision',
             widget => 'textArea',
-            cfg => {
+            set => {
                 required => true,
             },
             label => trm('Note to Requestor'),
@@ -203,7 +222,7 @@ sub getAllFieldValues ($self,@args) {
         ['job'
             => ['cbuser' => 'cbuser_id', 'job_cbuser'],
         ],
-        [qw(job_id job_server job_group job_src job_dst job_size job_note job_js job_decision cbuser_login)],
+        [qw(job_id job_name job_project job_server job_group job_src job_dst job_size job_note job_js job_decision cbuser_login)],
         {job_id => $id, job_js => [$jsHid2Id->{sized},$jsHid2Id->{denied},$jsHid2Id->{approved}] })->hash;
     die mkerror(39483,"Only sized, denied and approved jobs can be decided upon")
         if not $data;

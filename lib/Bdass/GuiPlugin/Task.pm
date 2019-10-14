@@ -77,7 +77,7 @@ has tableCfg => sub ($self) {
             type => 'date',
             format => 'yyyy-MM-dd HH:mm:ss Z',
             width => '3*',
-            key => 'v',
+            key => 'task_ts_created',
             sortable => true,
         },
         {
@@ -131,10 +131,13 @@ has userFilter => sub ($self) {
     if (not $self->user->may('admin')){
         $userFilter->{task_cbuser}  = $self->user->userId;
     };
+    return $userFilter;
 };
 
 sub getTableRowCount ($self,$args,@opts) {
-    return ($self->db->select('task',[\'count(task_id) AS count'],$self->userFilter)->hash->{count});
+    return ($self->db->select(['task'
+            => ['cbuser' => 'cbuser_id', 'task_cbuser'],
+        ],[\'count(task_id) AS count'],$self->userFilter)->hash->{count});
 }
 
 sub getTableData ($self,$args,@opts) {
@@ -155,7 +158,13 @@ sub getTableData ($self,$args,@opts) {
         ],
         ['task.*','cbuser_login'],$self->userFilter,\%SORT
     )->hashes->each(sub ($el,$id) {
-        $el->{'task_ts_'.$_} *= 1000 for qw(created started done);
+        for my $key (qw(created started done)) {
+            $el->{'task_ts_'.$key} *= 1000
+                if $el->{'task_ts_'.$key};
+        }
+
+        use Data::Dumper;
+        $self->log->debug(Dumper $el);
     })->to_array;
     return $data;
 }

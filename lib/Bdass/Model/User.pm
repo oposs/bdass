@@ -28,7 +28,7 @@ sub provisionOrUpdateUser {
     my $data = {
         login => $user->{samaccountname},
         given => $user->{givenname},
-        email => $user->{mail} // 'tobi@oetiker.ch',
+        email => $user->{mail},
         family => $user->{sn},
         groups => encode_json($groups),
     };

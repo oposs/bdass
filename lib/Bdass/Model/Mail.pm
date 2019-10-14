@@ -42,17 +42,17 @@ send email
 =cut
 
 sub sendMail ($self,$to,$subject,$message) {
-    if ($to =~ /^job:(\d+)/){
-        $self->sql->db->select(['cbuser' =>
+    if ($to =~ /^job:(\d+)$/){
+        $to = $self->sql->db->select(['cbuser' =>
             [ job => 'job_cbuser', 'cbuser_id']
         ],'cbuser_email',{
             job_id => $1
-        });
+        })->hash->{cbuser_email};
     }
-    elsif ($to =~ /^cbuser:(\d+)/){
-        $self->sql->db->select('cbuser','cbuser_mail',{
+    elsif ($to =~ /^cbuser:(\d+)$/){
+        $to = $self->sql->db->select('cbuser','cbuser_email',{
             cbuser_id => $1
-        });
+        })->hash->{cbuser_email};
     }
     eval {
         my $email = Email::MIME->create(
