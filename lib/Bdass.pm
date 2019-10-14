@@ -146,19 +146,19 @@ INSERT INTO js
     (10,'denied');
     
 CREATE TABLE IF NOT EXISTS job (
-    job_id  INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_js INTEGER REFERENCES js(js_id) DEFAULT 1,
+    job_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_js INTEGER NOT NULL REFERENCES js(js_id) DEFAULT 1,
     job_token TEXT NOT NULL UNIQUE,
     job_cbuser INTEGER NOT NULL REFERENCES cbuser(cbuser_id),
-    job_private BOOLEAN,
+    job_private BOOLEAN NOT NULL DEFAULT FALSE,
     job_group TEXT NOT NULL,
     job_server TEXT NOT NULL,
     job_size INTEGER,
     job_src TEXT NOT NULL,
     job_dst TEXT,
-    job_name TEXT,
-    job_project TEXT,
-    job_note TEXT,
+    job_name TEXT NOT NULL,
+    job_project TEXT NOT NULL,
+    job_note TEXT NOT NULL,
     job_decision TEXT,
     job_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')),
     job_ts_updated TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now'))
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS history (
 );
 
 ALTER TABLE cbuser ADD cbuser_groups TEXT default '{}';
-ALTER TABLE cbuser ADD cbuser_email TEXT NOT NULL;
+ALTER TABLE cbuser ADD cbuser_email TEXT NOT NULL default "-@-";
 
 CREATE VIRTUAL TABLE IF NOT EXISTS file USING fts4(
     file_job,
@@ -184,5 +184,16 @@ CREATE VIRTUAL TABLE IF NOT EXISTS file USING fts4(
     file_name,
     notindexed=file_size,
     notindexed=file_job
+);
+
+CREATE TABLE IF NOT EXISTS task (
+    task_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_cbuser INTEGER REFERENCES cbuser(cbuser_id),
+    task_call TEXT NOT NULL,
+    task_arguments TEXT, -- JSON
+    task_status TEXT,
+    task_ts_created TIMESTAMP NOT NULL DEFAULT (strftime('%s', 'now')),
+    task_ts_started TIMESTAMP,
+    task_ts_done TIMESTAMP
 );
 

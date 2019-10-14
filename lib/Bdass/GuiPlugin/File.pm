@@ -1,4 +1,4 @@
-package Bdass::GuiPlugin::Archive;
+package Bdass::GuiPlugin::File;
 use Mojo::Base 'CallBackery::GuiPlugin::AbstractTable',-signatures;
 use CallBackery::Translate qw(trm);
 use CallBackery::Exception qw(mkerror);
@@ -46,22 +46,10 @@ has formCfg => sub ($self) {
 
 has tableCfg => sub ($self) {
     return [
-        (
-            $self->user->may('admin')
-            ?  {
-                label => trm('User'),
-                type => 'text',
-                width => '2*',
-                key => 'cbuser_login',
-                sortable => true,
-                primary => true,
-            }
-            : ()
-        ),
         {
             label => trm('Archive Id'),
             type => 'string',
-            width => '2*',
+            width => '1*',
             key => 'file_job',
             sortable => false,
         },
@@ -75,21 +63,21 @@ has tableCfg => sub ($self) {
         {
             label => trm('Archive Owner'),
             type => 'string',
-            width => '2*',
+            width => '1*',
             key => 'cbuser_login',
             sortable => false,
         },
         {
             label => trm('File Name'),
             type => 'string',
-            width => '2*',
+            width => '5*',
             key => 'file_name',
             sortable => false,
         },
         {
             label => trm('File Date'),
             type => 'string',
-            width => '1*',
+            width => '2*',
             key => 'file_date',
             type => 'date',
             format => 'yyyy-MM-dd HH:mm:ss Z',
@@ -144,18 +132,16 @@ sub userFilter ($self,$query) {
         $userFilter->{-or} = [
             job_cbuser  => $self->user->userId,
             -and => [
-                -not_bool => 'job_private'
+                -not_bool => 'job_private',
                 job_group   => [ keys %{$self->user->userInfo->{groups}}]
             ]
         ]
     }
-    };
+ 
     if ($query) {
-        my @query = split /\s+/, $query;
-        $userFilter->{file} = { 
-            -match => $query
-        }
+        $userFilter->{file} = { 'MATCH' => $query }
     }
+    return $userFilter;
 };
 
 sub getTableRowCount ($self,$args,@opts) {
@@ -180,7 +166,7 @@ sub getTableData ($self,$args,@opts) {
     my $data = $self->db->select(
         ['file'
             => ['job' => 'job_id','file_job']
-            => ['cbuser' => 'cbuser_id', 'job_cbuser'],
+            => ['cbuser' => 'cbuser_id', 'job.job_cbuser'],
         ],
         ['file.*','job.*','cbuser_login'],$self->userFilter($query),\%SORT
     )->hashes->each(sub ($el,$id) {

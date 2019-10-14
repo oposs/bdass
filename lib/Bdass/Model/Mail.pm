@@ -27,9 +27,9 @@ has mailTransport => sub {
     });
 };
 
-has mailFrom => sub {
+has mailFrom => sub ($self) {
     $self->cfg->{BACKEND}{mail_from};
-}
+};
 
 has sql => sub ($self) {
     $self->app->database->sql
@@ -42,12 +42,17 @@ send email
 =cut
 
 sub sendMail ($self,$to,$subject,$message) {
-    if ($to =~ /^job:(\d+)/){
-        $self->sql->db->select(['cbuser' =>
+    if ($to =~ /^job:(\d+)$/){
+        $to = $self->sql->db->select(['cbuser' =>
             [ job => 'job_cbuser', 'cbuser_id']
-        ],'cbuser_mail',{
-            job_id => $1;
-        });
+        ],'cbuser_email',{
+            job_id => $1
+        })->hash->{cbuser_email};
+    }
+    elsif ($to =~ /^cbuser:(\d+)$/){
+        $to = $self->sql->db->select('cbuser','cbuser_email',{
+            cbuser_id => $1
+        })->hash->{cbuser_email};
     }
     eval {
         my $email = Email::MIME->create(
@@ -71,3 +76,5 @@ sub sendMail ($self,$to,$subject,$message) {
         $self->log->error("Sending mail to $to: $@");
     }
 }
+
+1;

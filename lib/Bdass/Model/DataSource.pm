@@ -3,8 +3,10 @@ package Bdass::Model::DataSource;
 use Mojo::Base -base,-signatures;
 use Time::HiRes qw(gettimeofday);
 use Mojo::Util qw(dumper);
+use Mojo::JSON qw(decode_json);
 use Mojo::File;
 use Mojo::IOLoop::Stream;
+use Bdass::Model::Mail;
 use IPC::Open3;
 
 
@@ -37,6 +39,10 @@ has sql => sub ($self) {
 
 has jsHid2Id => sub ($self) {
     $self->app->jsHid2Id
+};
+
+has mail => sub ($self) { 
+    Bdass::Model::Mail->new( app => $self->app );
 };
 
 =head3 checkPath($key,$path,$token)
@@ -92,6 +98,8 @@ sub addArchiveJob ($self,$args) {
                 job_server => $args->{server},
                 job_note => $args->{note},
                 job_src => $data->{path},
+                job_name => $args->{name},
+                job_project => $args->{project}
             },sub ($db,$error,$result) {
                 if ($error){
                     $tx = undef;
@@ -296,8 +304,8 @@ sub transferData ($self) {
                 return $plugin->streamFolder($job->{job_src})
             })->then( sub ($data) {
                 my $subpro = Mojo::Promise->new;
-                $self->log->debug("archiving job $job->{job_id}: $job->{job_src} -> $job->{job_dst}");
                 my $archive = $self->_jobToArchive($job);
+                $self->log->debug("archiving job $job->{job_id}: $job->{job_src} -> $archive");
                 open my $fh, "|- :raw", "zstd", "-", "-T","4","-f","-q","-o",
                     $archive
                     or die "opening job tar: $!";
@@ -433,6 +441,138 @@ sub catalogArchives ($self) {
     });
 }
 
+=head3 restoreArchives ($self)
+
+Go through the task log and start restore tasks.
+
+=cut
+
+sub restoreArchives ($self) {
+    return Mojo::Promise->new( sub ($resolve,$reject) {
+        my $jsHid2Id = $self->app->jsHid2Id;
+        my $sql = $self->app->database->sql;
+
+        $sql->db->select('task',undef,{
+            task_ts_started => undef,
+        },sub ($db,$error,$result) {
+            if ($error){
+                return $reject->($error);
+            }
+            $resolve->($result->hashes);
+        });
+    })->then(sub ($hashes) {
+        my @tasks;
+        for my $task (@{$hashes->to_array}) {
+            my $arguments = decode_json($task->{task_arguments});
+            next unless $task->{task_call} eq 'restore';
+            my $job = $self->sql->db->select(['job' => [
+                'cbuser', 'cbuser_id' => 'job_cbuser'
+            ]],undef,{
+                job_id => $arguments->{job_id}
+            })->hash;
+            push @tasks, Mojo::Promise->new(sub ($resolve,$reject) {
+                my $archive = $self->_jobToArchive($job);
+                
+                my $name = $job->{job_name};
+                $name =~ s{[^=_a-z0-9]}{_}g;
+                $name =  lc($job->{job_id}.'-'.$job->{cbuser_login}.'-'.$name);
+                my $restore_dir = $self->cfg->{BACKEND}{restore_dir}.'/'.$name;
+                $self->log->debug("restoring $archive to $restore_dir");
+                if (-e $restore_dir){
+                    return $reject->("archive restore target $restore_dir exists already");
+                }
+                mkdir $restore_dir,($job->{job_private} ? 0700 : 0750 );
+                my $uid = getpwnam($job->{cbuser_login});
+                my $gid = getgrnam($job->{job_group});
+                chown $uid,$gid, $restore_dir;
+                $self->sql->db->update('task',{
+                    task_ts_started => time,
+                    task_status => 'archive restoring'
+                },
+                {
+                    task_id => $task->{task_id}
+                });
+                Mojo::IOLoop->subprocess(sub ($subprocess) {
+                        chdir $restore_dir;
+                        system 'tar',
+                            '--use-compress-program=zstd',
+                            '--group='.$job->{job_group},
+                            '--owner='.$job->{cbuser_login},
+                            '--extract',
+                            '--file='.$archive;
+                        if ($? != 0) {
+                            $self->log->error("Extracting $archive failed.");
+
+                            system 'rm', '-rf', $restore_dir;
+                            $self->sql->db->update('task',{
+                                task_ts_started => undef,
+                                task_status => 'restore failed ... waiting for next round'
+                            },
+                            {
+                                task_id => $task->{task_id}
+                            });
+                        }
+                        return $?;
+                    }, 
+                    sub ($subprocess, $err, $ret) {
+                        if ($err or $ret){
+                            $self->_taskFail($task);
+                            $reject->("archive restore failed");
+                        }
+                        $self->_taskSuccess($task,$restore_dir);
+                        $resolve->({task => $task,job=>$job});
+                    }
+               );
+            });
+        }    
+        return \@tasks;
+    });
+}
+
+=head3 _taskFail ($self,$task)
+
+record task failure
+
+=cut
+
+sub _taskFail ($self,$task) {
+    $self->db->update('task',{
+        task_ts_started => undef,
+        task_ts_done => time,
+        task_status => 'archive restore failed'
+    },
+    {
+        task_id => $task->{task_id}
+    });
+    
+    $self->mail->sendMail(
+        "cbuser:".$task->{task_cbuser},
+        "Archive Restore request $task->{task_id} failed",
+        "see subject"
+    );   
+}
+
+=head3 _taskSuccess ($self,$task,$path)
+
+record task success
+
+=cut
+
+sub _taskSuccess ($self,$task,$path) {
+    $self->sql->db->update('task',{
+        task_ts_done => time,
+        task_status => 'archive restore successful'
+    },
+    {
+        task_id => $task->{task_id}
+    });
+    $self->mail->sendMail(
+        "cbuser:".$task->{task_cbuser},
+        "Archive Restore request $task->{task_id} is complete",
+        "You can find your restored files in $path"
+    );   
+}
+
 =head3 _jobToArchive ($self,$job)
 
 returns the archive path
@@ -440,20 +580,21 @@ returns the archive path
 =cut
 
 sub _jobToArchive ($self,$job) {
-    return $job->{job_dst}."/job_".$job->{job_id}.'.tar.zst';
+    my $name = "$job->{job_id}-$job->{job_project}-$job->{job_name}";
+    $name =~ s{[^=_a-z0-9]+}{_}g;
+    return $job->{job_dst}."/".$name.'.tar.zst';
 }
 
 =head3 _jobChown ($self,$job)
 
-chown job accordning to job settings.
+chown job according to job settings.
 
 =cut
 
 sub _jobChown ($self,$job) {
-
     my $user = $self->sql->db->select('cbuser','cbuser_login',{
         cbuser_id => $job->{job_cbuser}
-    })->result->hash->{cbuser_login};
+    })->hash->{cbuser_login};
     my $group = $job->{job_group};
     my $uid = getpwnam($user);
     my $gid = getgrnam($group);
@@ -523,7 +664,7 @@ sub revertJobCatalog ($self,$job) {
             if ($error){
                 return $pro->reject("error: ".$error);
             }
-            return $pro->resolve("catalog reverted for $job->{job_id}");
+            return $pro->reject("catalog reverted for $job->{job_id}");
         });
         return $pro;
     });
@@ -553,7 +694,6 @@ sub parseAndStoreCatalog ($self,$job,$linesArray) {
         $data{file_date} = $data{file_date}
             .' '
             .(delete $data{file_time});
-        $self->log->debug($self->app->dumper(\%data));
         $db->insert('file',\%data);
     }
     $tx->commit;

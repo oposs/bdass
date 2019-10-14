@@ -68,6 +68,8 @@ has userInfo => sub  {
             auth_success_cb => sub {
                 my $c = shift;
                 my $user = shift;
+                use Data::Dumper;
+                $self->log->debug(Dumper $user);
                 my $ldap = shift; # bound Net::LDAP::SPNEGO connection
                 my @groups = map {
                     getgrgid($_)->name;
@@ -94,7 +96,7 @@ has userInfo => sub  {
 };
 
 has loginName => sub {
-    shift->userInfo->{email} // '*UNKNOWN*';
+    shift->userInfo->{cbuser_login} // '*UNKNOWN*';
 };
 
 # this decides if the user can login

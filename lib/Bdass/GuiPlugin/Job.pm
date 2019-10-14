@@ -228,10 +228,14 @@ has userFilter => sub ($self) {
     if (not $self->user->may('admin')){
         $userFilter->{job_cbuser}  = $self->user->userId;
     };
+    return $userFilter;
 };
 
 sub getTableRowCount ($self,$args,@opts) {
-    return ($self->db->select('job',[\'count(job_id) AS count'],$self->userFilter)->hash->{count});
+    return ($self->db->select(['job'
+            => ['js' => 'js_id','job_js']
+            => ['cbuser' => 'cbuser_id', 'job_cbuser'],
+        ],[\'count(job_id) AS count'],$self->userFilter)->hash->{count});
 }
 
 sub getTableData ($self,$args,@opts) {

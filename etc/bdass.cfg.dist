@@ -7,6 +7,9 @@ sesame_pass = 393afhkjhffjj
 ad_uri = ldap://my-ad-Server
 admin_group = Remote Desktop Users
 smtp_server = smtp.example.com
+mail_from = sender@xample.com
+admin_email = admin@exampole.com
+restore_dir = /scratch/bdass-restore
 +ad_tls
 verify = none
 # see https://metacpan.org/pod/Net::LDAP#start_tls-(-OPTIONS-) for more OPTIONS
@@ -43,11 +46,19 @@ tab-name = Create Initial User
 
 *** PLUGIN: Job ***
 module = Job
-tab-name = Jobs
+tab-name = Archive Jobs
 
 *** PLUGIN: Archive ***
 module = Archive
 tab-name = Archives
+
+*** PLUGIN: Files ***
+module = File
+tab-name = Files
+
+*** PLUGIN: Tasks ***
+module = Task
+tab-name = Tasks
 
 *** PLUGIN: AdminUser ***
 module = Users
