@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "qxcompiler": "^0.2.13"
+    "qxcompiler": "^0.3.0"
   }
 }
